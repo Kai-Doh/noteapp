@@ -26,8 +26,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Two arch-specific macOS builds rather than one --target
+          # universal-apple-darwin: Tauri's universal-build lipo step has a
+          # known issue with multi-binary crates (this repo also builds a
+          # headless `server` bin for Docker) — it ignores Cargo.toml's
+          # default-run and tries to bundle the wrong binary. Building each
+          # arch separately avoids that code path entirely.
           - platform: "macos-latest"
-            args: "--target universal-apple-darwin"
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
           - platform: "ubuntu-22.04"
             args: ""
           - platform: "windows-latest"
