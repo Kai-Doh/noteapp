@@ -205,6 +205,15 @@ function VaultApp() {
     [store, autosave, selectAndFlush],
   );
 
+  const handleCreateNote = useCallback(
+    async (folderPath?: string) => {
+      const id = await store.createAndSelect("Untitled", "page", folderPath);
+      setViewMode("notes");
+      await store.selectNode(id);
+    },
+    [store],
+  );
+
   // Ctrl/Cmd+S: manual save. Ctrl/Cmd+K: open the search palette.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -254,10 +263,8 @@ function VaultApp() {
       ) : (
         <aside className="sidebar">
           <div className="sidebar-header">
+            <span className="brand-mark">N</span>
             <span className="app-title">noteapp</span>
-            <button className="search-trigger" onClick={() => setSearchOpen(true)}>
-              Search (Ctrl+K)
-            </button>
             <button
               className="collapse-trigger"
               onClick={() => setLeftCollapsed(true)}
@@ -266,6 +273,12 @@ function VaultApp() {
               «
             </button>
           </div>
+          <button className="sidebar-new-note-btn" onClick={() => handleCreateNote()}>
+            + New note
+          </button>
+          <button className="search-trigger" onClick={() => setSearchOpen(true)}>
+            Search <span className="kbd">Ctrl+K</span>
+          </button>
           <div className="view-mode-toggle">
             <button className={viewMode === "notes" ? "active" : ""} onClick={() => setViewMode("notes")}>
               Notes
@@ -287,11 +300,7 @@ function VaultApp() {
               selectedId={selectedId}
               onSelect={selectAndFlush}
               loading={store.listLoading}
-              onCreateNote={async (folderPath) => {
-                const id = await store.createAndSelect("Untitled", "page", folderPath);
-                setViewMode("notes");
-                await store.selectNode(id);
-              }}
+              onCreateNote={handleCreateNote}
             />
           )}
           <button className="reconfigure-trigger" onClick={() => setShowSettings(true)}>

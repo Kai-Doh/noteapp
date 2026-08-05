@@ -178,7 +178,6 @@ export function FolderTree({
         )}
       </div>
       <div className="folder-tree-actions">
-        <button onClick={() => onCreateNote()}>+ Note</button>
         <button
           onClick={() => {
             const name = window.prompt("New folder name (e.g. Fitness/Nutrition):");
