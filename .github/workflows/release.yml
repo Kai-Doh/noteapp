@@ -10,6 +10,14 @@
 # The Docker/server side is untouched by this — the homelab deployment
 # builds live from source via its own git-context docker-compose.yml
 # (src-tauri/docker-compose.yml), unrelated to this workflow.
+#
+# Artifacts are signed for the in-app auto-updater (tauri-plugin-updater):
+# TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD are repo
+# secrets (private key generated via `tauri signer generate`, kept outside
+# the repo — see the noteapp_github_repo memory for where). Once you
+# publish a draft release, `includeUpdaterJson` has already uploaded a
+# combined `latest.json` covering all platforms, which every installed
+# copy of the app checks against on launch.
 name: release
 
 on:
@@ -71,10 +79,13 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "noteapp ${{ github.ref_name }}"
           releaseBody: "See the assets below to download and install this version."
           releaseDraft: true
           prerelease: false
+          includeUpdaterJson: true
           args: ${{ matrix.args }}

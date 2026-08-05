@@ -59,6 +59,8 @@ mod desktop {
 
         tauri::Builder::default()
             .plugin(tauri_plugin_opener::init())
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_process::init())
             .invoke_handler(tauri::generate_handler![
                 get_server_config,
                 get_server_token,

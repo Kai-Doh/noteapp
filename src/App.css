@@ -730,6 +730,32 @@ button:hover {
   font-size: 0.85em;
 }
 
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--link-color, #3a63c9) 15%, transparent);
+  border-bottom: 1px solid var(--link-color, #3a63c9);
+  padding: 8px 16px;
+  font-size: 0.85em;
+}
+
+.update-banner-install,
+.update-banner-dismiss {
+  font-size: 0.9em;
+  padding: 3px 10px;
+}
+
+.update-banner-dismiss {
+  margin-left: auto;
+  background: transparent;
+  border-color: var(--border-color);
+}
+
+.update-banner-error {
+  color: #c94a4a;
+}
+
 .connection-settings {
   height: 100vh;
   display: flex;

@@ -10,6 +10,7 @@ import { ReviewQueuePanel } from "./components/ReviewQueuePanel";
 import { AiActivityFeed } from "./components/AiActivityFeed";
 import { GraphView } from "./components/GraphView";
 import { ConnectionSettings } from "./components/ConnectionSettings";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { useNotesStore } from "./state/notesStore";
 import { useAutosave } from "./state/autosave";
 import { patchNode } from "./api/nodes";
@@ -194,7 +195,9 @@ function VaultApp() {
   }
 
   return (
-    <div className="app-shell">
+    <>
+      <UpdateBanner />
+      <div className="app-shell">
       {leftCollapsed ? (
         <button
           className="sidebar-expand-strip"
@@ -353,7 +356,8 @@ function VaultApp() {
         onClose={() => setSearchOpen(false)}
         onSelect={(id) => selectAndFlush(id)}
       />
-    </div>
+      </div>
+    </>
   );
 }
 
