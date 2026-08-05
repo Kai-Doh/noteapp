@@ -1,16 +1,18 @@
 # Standalone compose file — run directly on the homelab VM via
-# `docker compose up -d --build` (build context is this directory, src-tauri/).
+# `docker compose up -d --build`.
 #
-# Deliberately not wired into Dokploy/the `homelab` git repo yet: Dokploy
-# stacks there build from that repo's own contents, but noteapp's source
-# lives in a separate repo on the desktop machine. Folding this in later
-# would mean either pushing `noteapp` as its own repo for Dokploy to watch,
-# or vendoring the source into `homelab/stacks/noteapp/` — a call for the
-# user to make, not something to do silently.
+# The build context is a git URL, not a local path: Docker/BuildKit clones
+# github.com/Kai-Doh/noteapp at build time and uses the src-tauri/ subdir
+# (`#main:src-tauri`) as context, so only this one file needs to live on the
+# VM — no more manually vendoring the source tree into a homelab stacks repo.
+# The Dockerfile only ever COPYs Cargo.toml/Cargo.lock/migrations/src (see
+# Dockerfile) — none of the frontend/Tauri desktop-app source is needed for
+# this build, so the desktop/Windows/Linux app stays a separate, manual
+# `npm run tauri build` step untouched by this file.
 services:
   noteapp:
     build:
-      context: .
+      context: https://github.com/Kai-Doh/noteapp.git#main:src-tauri
       dockerfile: Dockerfile
     image: noteapp-server:latest
     container_name: noteapp
