@@ -41,8 +41,8 @@ export function SearchPalette({ open, onClose, onSelect }: SearchPaletteProps) {
   if (!open) return null;
 
   return (
-    <div className="search-palette-backdrop" onClick={onClose}>
-      <div className="search-palette" onClick={(e) => e.stopPropagation()}>
+    <div className="dialog-backdrop" onClick={onClose}>
+      <div className="dialog search-palette" onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
           placeholder="Search notes…"

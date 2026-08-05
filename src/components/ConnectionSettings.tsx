@@ -5,9 +5,11 @@ import { apiFetch } from "../api/client";
 interface ConnectionSettingsProps {
   onConnected: () => void;
   onCancel?: () => void;
+  /** Rendered inside the dialog, above the hint text — e.g. why a previously-configured server is unreachable. */
+  banner?: string;
 }
 
-export function ConnectionSettings({ onConnected, onCancel }: ConnectionSettingsProps) {
+export function ConnectionSettings({ onConnected, onCancel, banner }: ConnectionSettingsProps) {
   const [url, setUrl] = useState("");
   const [token, setToken] = useState("");
   const [hadExistingConfig, setHadExistingConfig] = useState(false);
@@ -54,6 +56,7 @@ export function ConnectionSettings({ onConnected, onCancel }: ConnectionSettings
     <div className="connection-settings">
       <div className="connection-settings-card">
         <h1>Connect to your vault</h1>
+        {banner && <p className="connection-settings-error">{banner}</p>}
         <p className="connection-settings-hint">
           Enter the noteapp server's address and the <code>desktop</code> token printed in its
           startup logs (<code>docker logs &lt;container&gt;</code> if it's running in Docker).
@@ -78,7 +81,7 @@ export function ConnectionSettings({ onConnected, onCancel }: ConnectionSettings
             />
           </label>
           {error && <p className="connection-settings-error">{error}</p>}
-          <div className="connection-settings-actions">
+          <div className="connection-settings-actions dialog-actions">
             <button type="submit" disabled={status === "testing"}>
               {status === "testing" ? "Connecting…" : "Connect"}
             </button>

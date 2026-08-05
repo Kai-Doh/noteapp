@@ -4,6 +4,7 @@ import { AuthorBadge } from "./AuthorBadge";
 
 const NODE_TYPES: NodeType[] = ["page", "wiki", "journal", "project", "index", "decision", "research"];
 const ACTORS: ActorKind[] = ["user", "ai", "system"];
+const ACTOR_LABEL: Record<ActorKind, string> = { user: "Me", ai: "AI (Baymax)", system: "Imported" };
 
 interface TreeNode {
   name: string;
@@ -72,7 +73,9 @@ export function FolderTree({
   onCreateNote,
 }: FolderTreeProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [filterOpen, setFilterOpen] = useState(false);
   const tree = useMemo(() => buildTree(items), [items]);
+  const filterSummary = `${nodeType ?? "All types"} · ${actor ? ACTOR_LABEL[actor] : "Anyone"}`;
 
   function toggle(path: string) {
     setCollapsed((prev) => {
@@ -133,30 +136,47 @@ export function FolderTree({
 
   return (
     <div className="folder-tree">
-      <select
-        className="folder-tree-filter"
-        value={nodeType ?? ""}
-        onChange={(e) => onNodeTypeChange((e.target.value || undefined) as NodeType | undefined)}
-      >
-        <option value="">All types</option>
-        {NODE_TYPES.map((t) => (
-          <option key={t} value={t}>
-            {t}
-          </option>
-        ))}
-      </select>
-      <select
-        className="folder-tree-filter"
-        value={actor ?? ""}
-        onChange={(e) => onActorChange((e.target.value || undefined) as ActorKind | undefined)}
-      >
-        <option value="">Written by anyone</option>
-        {ACTORS.map((a) => (
-          <option key={a} value={a}>
-            {a === "user" ? "Me" : a === "ai" ? "AI (Baymax)" : "Imported"}
-          </option>
-        ))}
-      </select>
+      <div className="folder-tree-filter-bar">
+        <button
+          type="button"
+          className="folder-tree-filter-btn"
+          onClick={() => setFilterOpen((o) => !o)}
+        >
+          <span>Filter</span>
+          <span className="folder-tree-filter-summary">{filterSummary}</span>
+        </button>
+        {filterOpen && (
+          <>
+            <div className="folder-tree-filter-scrim" onClick={() => setFilterOpen(false)} />
+            <div className="folder-tree-filter-popover">
+              <select
+                className="folder-tree-filter"
+                value={nodeType ?? ""}
+                onChange={(e) => onNodeTypeChange((e.target.value || undefined) as NodeType | undefined)}
+              >
+                <option value="">All types</option>
+                {NODE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="folder-tree-filter"
+                value={actor ?? ""}
+                onChange={(e) => onActorChange((e.target.value || undefined) as ActorKind | undefined)}
+              >
+                <option value="">Written by anyone</option>
+                {ACTORS.map((a) => (
+                  <option key={a} value={a}>
+                    {ACTOR_LABEL[a]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
+      </div>
       <div className="folder-tree-actions">
         <button onClick={() => onCreateNote()}>+ Note</button>
         <button

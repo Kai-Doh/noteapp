@@ -7,18 +7,10 @@ import ForceGraph2D, {
 import { getGraph } from "../api/graph";
 import type { ActorKind, NodeType } from "../types/node";
 import type { GraphFilters } from "../types/graph";
+import { ACTOR_COLOR } from "../theme";
 
 const NODE_TYPES: NodeType[] = ["page", "wiki", "journal", "project", "index", "decision", "research"];
 const ACTORS: ActorKind[] = ["user", "ai", "system"];
-
-// Keyed by the server-computed color_key ('user'|'ai'|'system') — stable and
-// small regardless of how many node_types exist, per the plan's own reasoning
-// for why color_key is computed server-side in the first place.
-const COLOR_BY_KEY: Record<string, string> = {
-  user: "#4f8cff",
-  ai: "#a970ff",
-  system: "#6b7280",
-};
 
 interface GraphNode extends NodeObject {
   id: string;
@@ -198,7 +190,7 @@ export function GraphView({ onSelect }: GraphViewProps) {
           onEngineStop={() => fgRef.current?.zoomToFit(400, 40)}
           nodeId="id"
           nodeLabel={(n) => (n as GraphNode).title}
-          nodeColor={(n) => COLOR_BY_KEY[(n as GraphNode).color_key] ?? COLOR_BY_KEY.user}
+          nodeColor={(n) => ACTOR_COLOR[(n as GraphNode).color_key as ActorKind] ?? ACTOR_COLOR.user}
           nodeCanvasObjectMode={() => "after"}
           nodeCanvasObject={(n, ctx) => {
             const node = n as GraphNode;

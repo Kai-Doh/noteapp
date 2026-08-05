@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
-import { CodeMirrorEditor } from "./editor/CodeMirrorEditor";
+import { CodeMirrorEditor, type CodeMirrorEditorHandle, type FormatKind } from "./editor/CodeMirrorEditor";
 import { FolderTree } from "./components/FolderTree";
 import { Dashboard } from "./components/Dashboard";
 import { BacklinksPanel } from "./components/BacklinksPanel";
@@ -20,6 +20,43 @@ import type { PropertyInput } from "./types/node";
 
 type ViewMode = "notes" | "memory" | "graph";
 type ConnectionState = "checking" | "unconfigured" | "unreachable" | "connected";
+
+const TOOLBAR_BUTTONS: { kind: FormatKind; title: string; icon: React.ReactNode }[] = [
+  { kind: "bold", title: "Bold", icon: <span style={{ fontWeight: 700 }}>B</span> },
+  { kind: "italic", title: "Italic", icon: <span style={{ fontStyle: "italic" }}>I</span> },
+  {
+    kind: "list",
+    title: "List",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+        <circle cx="4.5" cy="6" r="1.1" fill="currentColor" stroke="none" />
+        <path d="M9 6h11" />
+        <circle cx="4.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
+        <path d="M9 12h11" />
+        <circle cx="4.5" cy="18" r="1.1" fill="currentColor" stroke="none" />
+        <path d="M9 18h11" />
+      </svg>
+    ),
+  },
+  {
+    kind: "quote",
+    title: "Quote",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M7 8c-2 0-3 1.5-3 3.5S5 15 7 15v3c-3 0-5.5-2.5-5.5-6.5S4 5 7 5v3zM17 8c-2 0-3 1.5-3 3.5S15 15 17 15v3c-3 0-5.5-2.5-5.5-6.5S14 5 17 5v3z" />
+      </svg>
+    ),
+  },
+  {
+    kind: "link",
+    title: "Link",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9.5 14.5l5-5M8 11.2 5.6 13.6a3 3 0 0 0 4.2 4.2L12 15.6M16 12.8l2.4-2.4a3 3 0 0 0-4.2-4.2L12 8.4" />
+      </svg>
+    ),
+  },
+];
 
 function App() {
   const [connectionState, setConnectionState] = useState<ConnectionState>("checking");
@@ -61,12 +98,14 @@ function App() {
 
   if (connectionState === "unconfigured" || connectionState === "unreachable") {
     return (
-      <>
-        {connectionState === "unreachable" && (
-          <div className="connection-banner">Couldn't reach the server: {checkError}</div>
-        )}
-        <ConnectionSettings onConnected={checkConnection} />
-      </>
+      <div className="dialog-backdrop">
+        <div className="dialog" style={{ width: "min(420px, 100%)" }}>
+          <ConnectionSettings
+            onConnected={checkConnection}
+            banner={connectionState === "unreachable" ? `Couldn't reach the server: ${checkError}` : undefined}
+          />
+        </div>
+      </div>
     );
   }
 
@@ -141,6 +180,8 @@ function VaultApp() {
     await store.refreshList();
   }, [folder, selectedNode, handlePropertiesChange, store]);
 
+  const editorRef = useRef<CodeMirrorEditorHandle>(null);
+
   const selectAndFlush = useCallback(
     async (id: string) => {
       await autosave.flush();
@@ -182,15 +223,19 @@ function VaultApp() {
 
   if (showSettings) {
     return (
-      <ConnectionSettings
-        onConnected={() => {
-          // Reconfiguring mid-session touches every cached client/server
-          // assumption (different vault entirely, potentially) — a full
-          // reload is the simplest way to guarantee nothing stale lingers.
-          window.location.reload();
-        }}
-        onCancel={() => setShowSettings(false)}
-      />
+      <div className="dialog-backdrop">
+        <div className="dialog" style={{ width: "min(420px, 100%)" }}>
+          <ConnectionSettings
+            onConnected={() => {
+              // Reconfiguring mid-session touches every cached client/server
+              // assumption (different vault entirely, potentially) — a full
+              // reload is the simplest way to guarantee nothing stale lingers.
+              window.location.reload();
+            }}
+            onCancel={() => setShowSettings(false)}
+          />
+        </div>
+      </div>
     );
   }
 
@@ -308,8 +353,22 @@ function VaultApp() {
                     {rightCollapsed ? "«" : "»"}
                   </button>
                 </div>
+                <div className="editor-toolbar">
+                  {TOOLBAR_BUTTONS.map((btn) => (
+                    <button
+                      key={btn.kind}
+                      type="button"
+                      className="editor-toolbar-btn"
+                      title={btn.title}
+                      onClick={() => editorRef.current?.applyFormat(btn.kind)}
+                    >
+                      {btn.icon}
+                    </button>
+                  ))}
+                </div>
                 <div className="note-editor">
                   <CodeMirrorEditor
+                    ref={editorRef}
                     value={content}
                     onChange={setContent}
                     onBlur={() => autosave.flush()}

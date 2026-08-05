@@ -1,12 +1,5 @@
 import type { ActorKind } from "../types/node";
-
-// Same palette as GraphView's color_key coloring, so "who wrote this" reads
-// consistently whether you're looking at the list or the graph.
-const COLOR_BY_ACTOR: Record<ActorKind, string> = {
-  user: "#4f8cff",
-  ai: "#a970ff",
-  system: "#6b7280",
-};
+import { ACTOR_COLOR } from "../theme";
 
 const LABEL_BY_ACTOR: Record<ActorKind, string> = {
   user: "You",
@@ -31,7 +24,7 @@ export function AuthorBadge({ actor }: AuthorBadgeProps) {
   return (
     <span
       className="author-badge"
-      style={{ color: COLOR_BY_ACTOR[actor], borderColor: COLOR_BY_ACTOR[actor] }}
+      style={{ color: ACTOR_COLOR[actor], borderColor: ACTOR_COLOR[actor] }}
       title={TITLE_BY_ACTOR[actor]}
     >
       {LABEL_BY_ACTOR[actor]}
