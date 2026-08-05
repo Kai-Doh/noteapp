@@ -1,0 +1,46 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Rust / Tauri build output
+src-tauri/target
+src-tauri/gen/schemas
+
+# Secrets / local-only config — never commit tokens, passwords, or env files
+*.env
+*.env.*
+password*.txt
+*.pem
+*.key
+token*.txt
+
+# DB files (server data lives outside the repo, not tracked)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Personal vault content pulled in for the one-time migration — never publish
+# note content to a public repo, only the migration tooling itself.
+migration/vault-import/

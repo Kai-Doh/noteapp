@@ -1,0 +1,27 @@
+# Standalone compose file — run directly on the homelab VM via
+# `docker compose up -d --build` (build context is this directory, src-tauri/).
+#
+# Deliberately not wired into Dokploy/the `homelab` git repo yet: Dokploy
+# stacks there build from that repo's own contents, but noteapp's source
+# lives in a separate repo on the desktop machine. Folding this in later
+# would mean either pushing `noteapp` as its own repo for Dokploy to watch,
+# or vendoring the source into `homelab/stacks/noteapp/` — a call for the
+# user to make, not something to do silently.
+services:
+  noteapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: noteapp-server:latest
+    container_name: noteapp
+    restart: unless-stopped
+    ports:
+      - "47823:47823"
+    volumes:
+      - noteapp-data:/data
+    environment:
+      NOTEAPP_BIND_ADDR: "0.0.0.0:47823"
+
+volumes:
+  noteapp-data:
+    name: noteapp-data
