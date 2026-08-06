@@ -131,6 +131,17 @@ function SplitPaneView(props: RenderProps & { tree: Extract<PaneNode, { type: "s
   const { tree, onResize } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
+  // Starts collapsed and grows into its real ratio right after mount, so a
+  // freshly created split visibly expands into place instead of snapping in
+  // at full size. Only fires once per split's lifetime — later resizer drags
+  // update `tree.ratio` on the same, already-mounted instance, so this
+  // doesn't replay then (and the transition is suppressed while actively
+  // dragging so the divider still tracks the pointer 1:1).
+  const [grown, setGrown] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setGrown(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   useEffect(() => {
     if (!dragging) return;
@@ -152,9 +163,13 @@ function SplitPaneView(props: RenderProps & { tree: Extract<PaneNode, { type: "s
     };
   }, [dragging, tree.dir, tree.id, onResize]);
 
+  const animated = !dragging;
   return (
     <div ref={containerRef} className={`pane-split pane-split-${tree.dir}`}>
-      <div className="pane-split-child" style={{ flexGrow: tree.ratio, flexBasis: 0 }}>
+      <div
+        className={`pane-split-child${animated ? " pane-split-child-animated" : ""}`}
+        style={{ flexGrow: grown ? tree.ratio : 0, flexBasis: 0 }}
+      >
         <PaneNodeView {...props} tree={tree.a} />
       </div>
       <div
@@ -164,20 +179,31 @@ function SplitPaneView(props: RenderProps & { tree: Extract<PaneNode, { type: "s
           setDragging(true);
         }}
       />
-      <div className="pane-split-child" style={{ flexGrow: 1 - tree.ratio, flexBasis: 0 }}>
+      <div
+        className={`pane-split-child${animated ? " pane-split-child-animated" : ""}`}
+        style={{ flexGrow: grown ? 1 - tree.ratio : 0, flexBasis: 0 }}
+      >
         <PaneNodeView {...props} tree={tree.b} />
       </div>
     </div>
   );
 }
 
+// Fixed pixel margins rather than a percentage of the pane's size — a
+// percentage-based edge band goes razor-thin (and hard to actually land on)
+// on a short or narrow pane, especially once several splits exist. Capped at
+// 35% of the dimension so a small pane doesn't lose its center entirely.
+const EDGE_ZONE_PX = 44;
+
 function zoneFromPointer(rect: DOMRect, x: number, y: number): SplitEdge | "center" {
-  const relX = (x - rect.left) / rect.width;
-  const relY = (y - rect.top) / rect.height;
-  if (relX < 0.22) return "left";
-  if (relX > 0.78) return "right";
-  if (relY < 0.22) return "top";
-  if (relY > 0.78) return "bottom";
+  const marginX = Math.min(EDGE_ZONE_PX, rect.width * 0.35);
+  const marginY = Math.min(EDGE_ZONE_PX, rect.height * 0.35);
+  const relX = x - rect.left;
+  const relY = y - rect.top;
+  if (relX < marginX) return "left";
+  if (relX > rect.width - marginX) return "right";
+  if (relY < marginY) return "top";
+  if (relY > rect.height - marginY) return "bottom";
   return "center";
 }
 
