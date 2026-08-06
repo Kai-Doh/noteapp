@@ -22,6 +22,8 @@ import type { PropertyInput } from "./types/node";
 type ViewMode = "notes" | "memory" | "graph";
 type ConnectionState = "checking" | "unconfigured" | "unreachable" | "connected";
 
+const VIEW_MODE_INDEX: Record<ViewMode, number> = { notes: 0, memory: 1, graph: 2 };
+
 const TOOLBAR_BUTTONS: { kind: FormatKind; title: string; icon: React.ReactNode }[] = [
   { kind: "bold", title: "Bold", icon: <span style={{ fontWeight: 700 }}>B</span> },
   { kind: "italic", title: "Italic", icon: <span style={{ fontStyle: "italic" }}>I</span> },
@@ -277,6 +279,10 @@ function VaultApp() {
             Search <span className="kbd">Ctrl+K</span>
           </button>
           <div className="view-mode-toggle">
+            <div
+              className="view-mode-indicator"
+              style={{ transform: `translateX(${VIEW_MODE_INDEX[viewMode] * 100}%)` }}
+            />
             <button className={viewMode === "notes" ? "active" : ""} onClick={() => setViewMode("notes")}>
               Notes
             </button>
