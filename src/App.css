@@ -85,12 +85,33 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .app-shell { display: flex; height: 100vh; overflow: hidden; }
 
 .sidebar {
-  flex: 0 0 264px; width: 264px;
+  position: relative;
+  flex: 0 0 264px; width: 264px; overflow: hidden;
   border-right: 1px solid var(--color-divider);
   background: var(--color-surface);
   display: flex; flex-direction: column; min-height: 0;
-  padding: 12px; gap: 12px;
+  transition: flex-basis 240ms cubic-bezier(0.2, 0.8, 0.2, 1), width 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+.sidebar-collapsed { flex-basis: 20px; width: 20px; }
+
+/* Fixed min-width so the real content never reflows/wraps as its parent
+   shrinks — the parent's overflow:hidden clips it instead, giving a
+   "slides out to the left" feel rather than a jarring text reflow. */
+.sidebar-content {
+  display: flex; flex-direction: column; min-height: 0; flex: 1;
+  padding: 12px; gap: 12px; min-width: 264px;
+  transition: opacity 160ms ease;
+}
+.sidebar-collapsed .sidebar-content { opacity: 0; pointer-events: none; }
+
+.sidebar-toggle-tab {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 20px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 0; border-left: 1px solid var(--color-divider);
+  background: transparent; color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  padding: 0; cursor: pointer;
+}
+.sidebar-toggle-tab:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); color: var(--color-text); }
 
 .sidebar-header { display: flex; align-items: center; gap: 6px; padding: 4px 2px; }
 .app-title { font-weight: 500; font-family: "Inter", system-ui, sans-serif; font-size: 15px; flex: 1; }
@@ -105,11 +126,6 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   font-size: 0.8em; padding: 4px 8px; background: transparent; border-color: transparent;
   color: color-mix(in srgb, var(--color-text) 55%, transparent); flex-shrink: 0;
 }
-.sidebar-expand-strip {
-  flex: 0 0 20px; width: 20px; border: none; border-right: 1px solid var(--color-divider);
-  background: transparent; color: color-mix(in srgb, var(--color-text) 55%, transparent); cursor: pointer; padding: 0;
-}
-.sidebar-expand-strip:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
 
 .brand-mark {
   width: 22px; height: 22px; border-radius: 6px; flex: none;
@@ -382,8 +398,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .settings-update-status { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
 
 .settings-dialog { padding: 0; gap: 0; max-height: 80vh; }
-.settings-dialog-title { font-size: 20px; font-weight: 500; padding: 16px 16px 0; flex: none; }
+.settings-dialog-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 0; flex: none; }
+.settings-dialog-title { font-size: 20px; font-weight: 500; }
 .settings-dialog-body { display: flex; min-height: 340px; overflow: hidden; }
+
+.dialog-close-btn {
+  width: 26px; height: 26px; padding: 0; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; line-height: 1; color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.dialog-close-btn:hover { color: var(--color-text); background: color-mix(in srgb, var(--color-text) 10%, transparent); }
 .settings-sidebar { flex: 0 0 140px; display: flex; flex-direction: column; gap: 2px; padding: 16px 10px; border-right: 1px solid var(--color-divider); }
 .settings-sidebar-item { text-align: left; border-color: transparent; color: color-mix(in srgb, var(--color-text) 70%, transparent); padding: 8px 10px; font-size: 13px; }
 .settings-sidebar-item:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConnectionSettings } from "./ConnectionSettings";
 import { UpdateSettingsSection } from "./UpdateSettingsSection";
 
@@ -17,10 +17,27 @@ interface SettingsDialogProps {
 export function SettingsDialog({ onConnected, onCancel }: SettingsDialogProps) {
   const [category, setCategory] = useState<Category>("server");
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
   return (
-    <div className="dialog-backdrop">
-      <div className="dialog settings-dialog" style={{ width: "min(640px, 100%)" }}>
-        <div className="settings-dialog-title">Settings</div>
+    <div className="dialog-backdrop" onClick={onCancel}>
+      <div
+        className="dialog settings-dialog"
+        style={{ width: "min(640px, 100%)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="settings-dialog-header">
+          <div className="settings-dialog-title">Settings</div>
+          <button type="button" className="dialog-close-btn" onClick={onCancel} title="Close">
+            ×
+          </button>
+        </div>
         <div className="settings-dialog-body">
           <nav className="settings-sidebar">
             {CATEGORIES.map((c) => (

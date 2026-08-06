@@ -251,26 +251,11 @@ function VaultApp() {
     <>
       <UpdateBanner />
       <div className="app-shell">
-      {leftCollapsed ? (
-        <button
-          className="sidebar-expand-strip"
-          onClick={() => setLeftCollapsed(false)}
-          title="Show sidebar"
-        >
-          »
-        </button>
-      ) : (
-        <aside className="sidebar">
+      <aside className={`sidebar${leftCollapsed ? " sidebar-collapsed" : ""}`}>
+        <div className="sidebar-content">
           <div className="sidebar-header">
             <span className="brand-mark">N</span>
             <span className="app-title">noteapp</span>
-            <button
-              className="collapse-trigger"
-              onClick={() => setLeftCollapsed(true)}
-              title="Hide sidebar"
-            >
-              «
-            </button>
           </div>
           <button className="sidebar-new-note-btn" onClick={() => handleCreateNote()}>
             + New note
@@ -309,8 +294,15 @@ function VaultApp() {
           <button className="reconfigure-trigger" onClick={() => setShowSettings(true)}>
             ⚙ Settings
           </button>
-        </aside>
-      )}
+        </div>
+        <button
+          className="sidebar-toggle-tab"
+          onClick={() => setLeftCollapsed((c) => !c)}
+          title={leftCollapsed ? "Show sidebar" : "Hide sidebar"}
+        >
+          {leftCollapsed ? "»" : "«"}
+        </button>
+      </aside>
 
       {viewMode === "memory" && (
         <main className="main-pane memory-view">
