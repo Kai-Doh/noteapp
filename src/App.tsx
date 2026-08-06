@@ -10,6 +10,7 @@ import { ReviewQueuePanel } from "./components/ReviewQueuePanel";
 import { AiActivityFeed } from "./components/AiActivityFeed";
 import { GraphView } from "./components/GraphView";
 import { ConnectionSettings } from "./components/ConnectionSettings";
+import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { useNotesStore } from "./state/notesStore";
 import { useAutosave } from "./state/autosave";
@@ -232,21 +233,15 @@ function VaultApp() {
 
   if (showSettings) {
     return (
-      <div className="dialog-backdrop">
-        <div className="dialog" style={{ width: "min(420px, 100%)" }}>
-          <ConnectionSettings
-            title="Settings"
-            showUpdateSection
-            onConnected={() => {
-              // Reconfiguring mid-session touches every cached client/server
-              // assumption (different vault entirely, potentially) — a full
-              // reload is the simplest way to guarantee nothing stale lingers.
-              window.location.reload();
-            }}
-            onCancel={() => setShowSettings(false)}
-          />
-        </div>
-      </div>
+      <SettingsDialog
+        onConnected={() => {
+          // Reconfiguring mid-session touches every cached client/server
+          // assumption (different vault entirely, potentially) — a full
+          // reload is the simplest way to guarantee nothing stale lingers.
+          window.location.reload();
+        }}
+        onCancel={() => setShowSettings(false)}
+      />
     );
   }
 

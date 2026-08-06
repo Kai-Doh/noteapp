@@ -1,26 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { getServerConfig, getServerToken, setServerConfig } from "../api/connection";
 import { apiFetch } from "../api/client";
-import { UpdateSettingsSection } from "./UpdateSettingsSection";
 
 interface ConnectionSettingsProps {
   onConnected: () => void;
   onCancel?: () => void;
   /** Rendered inside the dialog, above the hint text — e.g. why a previously-configured server is unreachable. */
   banner?: string;
-  /** Dialog heading — "Connect to your vault" for first-run/reconnect, "Settings" once already connected. */
-  title?: string;
-  /** Shows the "Check for updates" section below the connection form — only relevant once already connected. */
-  showUpdateSection?: boolean;
+  /** Suppresses the "Connect to your vault" heading when nested inside SettingsDialog's own "Server" tab. */
+  embedded?: boolean;
 }
 
-export function ConnectionSettings({
-  onConnected,
-  onCancel,
-  banner,
-  title = "Connect to your vault",
-  showUpdateSection = false,
-}: ConnectionSettingsProps) {
+export function ConnectionSettings({ onConnected, onCancel, banner, embedded = false }: ConnectionSettingsProps) {
   const [url, setUrl] = useState("");
   const [token, setToken] = useState("");
   const [hadExistingConfig, setHadExistingConfig] = useState(false);
@@ -66,7 +57,7 @@ export function ConnectionSettings({
   return (
     <div className="connection-settings">
       <div className="connection-settings-card">
-        <h1>{title}</h1>
+        {!embedded && <h1>Connect to your vault</h1>}
         {banner && <p className="connection-settings-error">{banner}</p>}
         <p className="connection-settings-hint">
           Enter the noteapp server's address and the <code>desktop</code> token printed in its
@@ -103,7 +94,6 @@ export function ConnectionSettings({
             )}
           </div>
         </form>
-        {showUpdateSection && <UpdateSettingsSection />}
       </div>
     </div>
   );

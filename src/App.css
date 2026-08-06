@@ -344,6 +344,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .settings-update-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.85em; }
 .settings-update-status { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
 
+.settings-dialog { padding: 0; gap: 0; max-height: 80vh; }
+.settings-dialog-title { font-size: 20px; font-weight: 500; padding: 16px 16px 0; flex: none; }
+.settings-dialog-body { display: flex; min-height: 340px; overflow: hidden; }
+.settings-sidebar { flex: 0 0 140px; display: flex; flex-direction: column; gap: 2px; padding: 16px 10px; border-right: 1px solid var(--color-divider); }
+.settings-sidebar-item { text-align: left; border-color: transparent; color: color-mix(in srgb, var(--color-text) 70%, transparent); padding: 8px 10px; font-size: 13px; }
+.settings-sidebar-item:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); }
+.settings-sidebar-item.active { background: var(--color-accent-900); color: var(--color-accent-100); }
+.settings-content { flex: 1; min-width: 0; padding: 16px; overflow-y: auto; }
+.settings-content .settings-section { margin-top: 0; padding-top: 0; border-top: none; }
+
 .reconfigure-trigger { font-size: 13.5px; padding: 8px 10px; background: transparent; color: color-mix(in srgb, var(--color-text) 55%, transparent); display: flex; align-items: center; gap: 10px; border-radius: var(--radius-md); }
 .reconfigure-trigger:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); color: var(--color-text); }
 
