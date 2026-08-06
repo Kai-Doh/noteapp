@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ActorKind, NodeSummaryDto, NodeType } from "../types/node";
 import { AuthorBadge } from "./AuthorBadge";
 
@@ -43,6 +43,12 @@ function countAll(node: TreeNode): number {
   return n;
 }
 
+function collectFolderPaths(node: TreeNode, out: string[] = []): string[] {
+  if (node.path) out.push(node.path);
+  for (const child of node.children.values()) collectFolderPaths(child, out);
+  return out;
+}
+
 interface FolderTreeProps {
   items: NodeSummaryDto[];
   nodeType: NodeType | undefined;
@@ -75,7 +81,21 @@ export function FolderTree({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
   const tree = useMemo(() => buildTree(items), [items]);
+  const allFolderPaths = useMemo(() => collectFolderPaths(tree), [tree]);
   const filterSummary = `${nodeType ?? "All types"} · ${actor ? ACTOR_LABEL[actor] : "Anyone"}`;
+
+  // Everything starts collapsed on launch — fires once, the first time real
+  // folder data shows up, not on every later refresh (which would keep
+  // stomping on folders the user deliberately expanded).
+  const appliedInitialCollapse = useRef(false);
+  useEffect(() => {
+    if (appliedInitialCollapse.current || allFolderPaths.length === 0) return;
+    appliedInitialCollapse.current = true;
+    setCollapsed(new Set(allFolderPaths));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allFolderPaths]);
+
+  const allCollapsed = allFolderPaths.length > 0 && allFolderPaths.every((p) => collapsed.has(p));
 
   function toggle(path: string) {
     setCollapsed((prev) => {
@@ -84,6 +104,10 @@ export function FolderTree({
       else next.add(path);
       return next;
     });
+  }
+
+  function toggleAll() {
+    setCollapsed(allCollapsed ? new Set() : new Set(allFolderPaths));
   }
 
   function renderNode(node: TreeNode, depth: number): React.ReactNode {
@@ -186,6 +210,13 @@ export function FolderTree({
           }}
         >
           + Folder
+        </button>
+        <button
+          onClick={toggleAll}
+          disabled={allFolderPaths.length === 0}
+          title={allCollapsed ? "Expand all folders" : "Collapse all folders"}
+        >
+          {allCollapsed ? "Expand all" : "Collapse all"}
         </button>
       </div>
       <div className="folder-tree-list">
