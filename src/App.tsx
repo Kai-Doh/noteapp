@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
-import { CodeMirrorEditor, type CodeMirrorEditorHandle, type FormatKind } from "./editor/CodeMirrorEditor";
 import { FolderTree } from "./components/FolderTree";
 import { Dashboard } from "./components/Dashboard";
-import { BacklinksPanel } from "./components/BacklinksPanel";
-import { PropertiesPanel } from "./components/PropertiesPanel";
 import { SearchPalette } from "./components/SearchPalette";
 import { ReviewQueuePanel } from "./components/ReviewQueuePanel";
 import { AiActivityFeed } from "./components/AiActivityFeed";
@@ -12,54 +9,32 @@ import { GraphView } from "./components/GraphView";
 import { ConnectionSettings } from "./components/ConnectionSettings";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { NoteEditorPane } from "./components/NoteEditorPane";
+import { PaneWorkspace } from "./components/PaneWorkspace";
 import { useNotesStore } from "./state/notesStore";
-import { useAutosave } from "./state/autosave";
-import { patchNode } from "./api/nodes";
 import { apiFetch } from "./api/client";
 import { getServerConfig } from "./api/connection";
-import type { PropertyInput } from "./types/node";
+import {
+  closeTab,
+  closeTabEverywhere,
+  collectLeaves,
+  findLeaf,
+  loadPaneTree,
+  moveTab,
+  openInPane,
+  savePaneTree,
+  setActiveTab,
+  splitWithTab,
+  updateRatio,
+  type LeafPane,
+  type PaneNode,
+  type SplitEdge,
+} from "./state/paneTree";
 
 type ViewMode = "notes" | "memory" | "graph";
 type ConnectionState = "checking" | "unconfigured" | "unreachable" | "connected";
 
 const VIEW_MODE_INDEX: Record<ViewMode, number> = { notes: 0, memory: 1, graph: 2 };
-
-const TOOLBAR_BUTTONS: { kind: FormatKind; title: string; icon: React.ReactNode }[] = [
-  { kind: "bold", title: "Bold", icon: <span style={{ fontWeight: 700 }}>B</span> },
-  { kind: "italic", title: "Italic", icon: <span style={{ fontStyle: "italic" }}>I</span> },
-  {
-    kind: "list",
-    title: "List",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
-        <circle cx="4.5" cy="6" r="1.1" fill="currentColor" stroke="none" />
-        <path d="M9 6h11" />
-        <circle cx="4.5" cy="12" r="1.1" fill="currentColor" stroke="none" />
-        <path d="M9 12h11" />
-        <circle cx="4.5" cy="18" r="1.1" fill="currentColor" stroke="none" />
-        <path d="M9 18h11" />
-      </svg>
-    ),
-  },
-  {
-    kind: "quote",
-    title: "Quote",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M7 8c-2 0-3 1.5-3 3.5S5 15 7 15v3c-3 0-5.5-2.5-5.5-6.5S4 5 7 5v3zM17 8c-2 0-3 1.5-3 3.5S15 15 17 15v3c-3 0-5.5-2.5-5.5-6.5S14 5 17 5v3z" />
-      </svg>
-    ),
-  },
-  {
-    kind: "link",
-    title: "Link",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9.5 14.5l5-5M8 11.2 5.6 13.6a3 3 0 0 0 4.2 4.2L12 15.6M16 12.8l2.4-2.4a3 3 0 0 0-4.2-4.2L12 8.4" />
-      </svg>
-    ),
-  },
-];
 
 function App() {
   const [connectionState, setConnectionState] = useState<ConnectionState>("checking");
@@ -117,15 +92,10 @@ function App() {
 
 function VaultApp() {
   const store = useNotesStore();
-  const { selectedNode, selectedId } = store;
 
   const [viewMode, setViewMode] = useState<ViewMode>("notes");
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [folder, setFolder] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
   // Persisted so the layout choice survives a restart, not just this session.
   const [leftCollapsed, setLeftCollapsed] = useState(
     () => localStorage.getItem("noteapp.leftCollapsed") === "1",
@@ -134,104 +104,109 @@ function VaultApp() {
     () => localStorage.getItem("noteapp.rightCollapsed") === "1",
   );
 
+  const [paneTree, setPaneTree] = useState<PaneNode>(() => loadPaneTree());
+  const [activePaneId, setActivePaneId] = useState<string>(() => collectLeaves(paneTree)[0].id);
+  const activePaneIdRef = useRef(activePaneId);
+  useEffect(() => {
+    activePaneIdRef.current = activePaneId;
+  }, [activePaneId]);
+
   useEffect(() => {
     localStorage.setItem("noteapp.leftCollapsed", leftCollapsed ? "1" : "0");
   }, [leftCollapsed]);
   useEffect(() => {
     localStorage.setItem("noteapp.rightCollapsed", rightCollapsed ? "1" : "0");
   }, [rightCollapsed]);
-
-  // Sync local draft state whenever a (possibly different) note finishes loading.
   useEffect(() => {
-    if (selectedNode) {
-      setTitle(selectedNode.title);
-      setContent(selectedNode.content);
-      setFolder(selectedNode.properties.find((p) => p.key === "folder")?.value_text ?? "");
+    savePaneTree(paneTree);
+  }, [paneTree]);
+  // A pane can disappear out from under the active selection (its last tab
+  // closed and the split it lived in collapsed) — always fall back to some
+  // still-existing leaf so "+New note"/sidebar clicks have somewhere to go.
+  useEffect(() => {
+    if (!findLeaf(paneTree, activePaneId)) {
+      setActivePaneId(collectLeaves(paneTree)[0].id);
     }
-  }, [selectedNode?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [paneTree, activePaneId]);
 
-  const handleSave = useCallback(
-    async (patch: { title?: string; content?: string }) => {
-      if (!selectedId) return;
-      await patchNode(selectedId, patch);
-      setSavedAt(new Date());
-      await Promise.all([store.refreshSelected(), store.refreshList()]);
+  const openNoteInPane = useCallback((paneId: string, nodeId: string) => {
+    setPaneTree((t) => openInPane(t, paneId, nodeId));
+    setActivePaneId(paneId);
+  }, []);
+
+  const focusPane = useCallback((paneId: string) => setActivePaneId(paneId), []);
+
+  const activateTab = useCallback((paneId: string, nodeId: string) => {
+    setPaneTree((t) => setActiveTab(t, paneId, nodeId));
+    setActivePaneId(paneId);
+  }, []);
+
+  const closeTabHandler = useCallback((paneId: string, nodeId: string) => {
+    setPaneTree((t) => closeTab(t, paneId, nodeId));
+  }, []);
+
+  const moveTabHandler = useCallback((nodeId: string, sourcePaneId: string, targetPaneId: string) => {
+    setPaneTree((t) => moveTab(t, sourcePaneId, targetPaneId, nodeId));
+    setActivePaneId(targetPaneId);
+  }, []);
+
+  const splitHandler = useCallback(
+    (targetPaneId: string, edge: SplitEdge, nodeId: string, sourcePaneId: string) => {
+      setPaneTree((t) => splitWithTab(t, targetPaneId, edge, nodeId, sourcePaneId));
+      setActivePaneId(targetPaneId);
     },
-    [selectedId, store],
+    [],
   );
 
-  const autosave = useAutosave({ nodeId: selectedId, title, content, onSave: handleSave });
-
-  const handlePropertiesChange = useCallback(
-    async (properties: PropertyInput[]) => {
-      if (!selectedId) return;
-      // Property changes save immediately (not on the idle timer) per the
-      // plan: property/link mutations are one of the explicit save triggers.
-      await patchNode(selectedId, { properties });
-      setSavedAt(new Date());
-      await store.refreshSelected();
-    },
-    [selectedId, store],
-  );
-
-  const handleFolderBlur = useCallback(async () => {
-    if (!selectedNode) return;
-    const trimmed = folder.trim();
-    const existing = selectedNode.properties.find((p) => p.key === "folder")?.value_text ?? "";
-    if (trimmed === existing) return;
-    await handlePropertiesChange([{ key: "folder", value_type: "text", value_text: trimmed || null }]);
-    await store.refreshList();
-  }, [folder, selectedNode, handlePropertiesChange, store]);
-
-  const editorRef = useRef<CodeMirrorEditorHandle>(null);
-
-  const selectAndFlush = useCallback(
-    async (id: string) => {
-      await autosave.flush();
-      await store.selectNode(id);
-    },
-    [autosave, store],
-  );
+  const resizeHandler = useCallback((splitId: string, ratio: number) => {
+    setPaneTree((t) => updateRatio(t, splitId, ratio));
+  }, []);
 
   const handleNavigateToTitle = useCallback(
-    async (rawTitle: string) => {
-      const existingId = await store.selectByTitle(rawTitle);
-      if (existingId) {
-        await selectAndFlush(existingId);
+    async (paneId: string, rawTitle: string) => {
+      const match = store.findByTitle(rawTitle);
+      if (match) {
+        openNoteInPane(paneId, match.id);
         return;
       }
       if (window.confirm(`No note titled "${rawTitle}" yet. Create it?`)) {
-        await autosave.flush();
-        await store.createAndSelect(rawTitle);
+        const id = await store.createNote(rawTitle);
+        openNoteInPane(paneId, id);
       }
     },
-    [store, autosave, selectAndFlush],
+    [store, openNoteInPane],
   );
 
   const handleCreateNote = useCallback(
     async (folderPath?: string) => {
-      const id = await store.createAndSelect("Untitled", "page", folderPath);
+      const id = await store.createNote("Untitled", "page", folderPath);
       setViewMode("notes");
-      await store.selectNode(id);
+      openNoteInPane(activePaneIdRef.current, id);
+    },
+    [store, openNoteInPane],
+  );
+
+  const handleDeleteNote = useCallback(
+    async (id: string) => {
+      await store.deleteNode(id);
+      setPaneTree((t) => closeTabEverywhere(t, id));
     },
     [store],
   );
 
-  // Ctrl/Cmd+S: manual save. Ctrl/Cmd+K: open the search palette.
+  // Ctrl/Cmd+K: open the search palette. Save-flushing is handled per open
+  // tab now (see NoteEditorPane), since more than one can be open at once.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        autosave.flush();
-      } else if (mod && e.key.toLowerCase() === "k") {
+      if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setSearchOpen(true);
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [autosave]);
+  }, []);
 
   if (showSettings) {
     return (
@@ -243,6 +218,34 @@ function VaultApp() {
           window.location.reload();
         }}
         onCancel={() => setShowSettings(false)}
+      />
+    );
+  }
+
+  const activeLeaf = findLeaf(paneTree, activePaneId);
+
+  function renderLeafContent(pane: LeafPane) {
+    if (!pane.activeId) {
+      return (
+        <Dashboard
+          items={store.items}
+          onSelect={(id) => openNoteInPane(pane.id, id)}
+          onQuickCapture={async (t) => {
+            const id = await store.createNote(t);
+            openNoteInPane(pane.id, id);
+          }}
+        />
+      );
+    }
+    return (
+      <NoteEditorPane
+        key={pane.activeId}
+        nodeId={pane.activeId}
+        onNavigateToTitle={(title) => handleNavigateToTitle(pane.id, title)}
+        onOpenById={(id) => openNoteInPane(pane.id, id)}
+        onNoteSaved={() => store.refreshList()}
+        rightCollapsed={rightCollapsed}
+        onToggleRight={() => setRightCollapsed((c) => !c)}
       />
     );
   }
@@ -285,11 +288,11 @@ function VaultApp() {
               onNodeTypeChange={store.setNodeType}
               actor={store.actor}
               onActorChange={store.setActor}
-              selectedId={selectedId}
-              onSelect={selectAndFlush}
+              selectedId={activeLeaf?.activeId ?? null}
+              onSelect={(id) => openNoteInPane(activePaneIdRef.current, id)}
               loading={store.listLoading}
               onCreateNote={handleCreateNote}
-              onDeleteNote={store.deleteNode}
+              onDeleteNote={handleDeleteNote}
             />
           )}
           <button className="reconfigure-trigger" onClick={() => setShowSettings(true)}>
@@ -314,111 +317,36 @@ function VaultApp() {
 
       {viewMode === "graph" && (
         <main className="main-pane graph-pane">
-          <GraphView onSelect={(id) => { setViewMode("notes"); selectAndFlush(id); }} />
+          <GraphView
+            onSelect={(id) => {
+              setViewMode("notes");
+              openNoteInPane(activePaneIdRef.current, id);
+            }}
+          />
         </main>
       )}
 
       {viewMode === "notes" && (
-        <>
-          <main className="main-pane">
-            {!selectedId && (
-              <Dashboard
-                items={store.items}
-                onSelect={selectAndFlush}
-                onQuickCapture={async (t) => {
-                  await store.createAndSelect(t);
-                }}
-              />
-            )}
-
-            {selectedId && selectedNode && (
-              <div className="note-view">
-                <div className="note-header">
-                  <input
-                    className="note-title-input"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    onBlur={() => autosave.flush()}
-                  />
-                  <input
-                    className="note-folder-input"
-                    value={folder}
-                    placeholder="Folder (e.g. Fitness/Nutrition)"
-                    onChange={(e) => setFolder(e.target.value)}
-                    onBlur={handleFolderBlur}
-                  />
-                  <span className="save-status">
-                    {savedAt ? `Saved ${savedAt.toLocaleTimeString()}` : " "}
-                  </span>
-                  <button
-                    className="collapse-trigger"
-                    onClick={() => setRightCollapsed((c) => !c)}
-                    title={rightCollapsed ? "Show properties/backlinks" : "Hide properties/backlinks"}
-                  >
-                    {rightCollapsed ? "«" : "»"}
-                  </button>
-                </div>
-                <div className="editor-toolbar">
-                  {TOOLBAR_BUTTONS.map((btn) => (
-                    <button
-                      key={btn.kind}
-                      type="button"
-                      className="editor-toolbar-btn"
-                      title={btn.title}
-                      onClick={() => editorRef.current?.applyFormat(btn.kind)}
-                    >
-                      {btn.icon}
-                    </button>
-                  ))}
-                </div>
-                <div className="note-editor">
-                  <CodeMirrorEditor
-                    ref={editorRef}
-                    value={content}
-                    onChange={setContent}
-                    onBlur={() => autosave.flush()}
-                    onNavigateToTitle={handleNavigateToTitle}
-                  />
-                </div>
-              </div>
-            )}
-
-            {selectedId && !selectedNode && <div className="panel-empty">Loading…</div>}
-          </main>
-
-          {selectedId && selectedNode && !rightCollapsed && (
-            <aside className="right-panel">
-              <PropertiesPanel properties={selectedNode.properties} onChange={handlePropertiesChange} />
-
-              <div className="outgoing-links">
-                <h3>Outgoing links</h3>
-                {selectedNode.links.length === 0 && <div className="panel-empty">No links in this note.</div>}
-                <ul>
-                  {selectedNode.links.map((l) => (
-                    <li key={l.id}>
-                      <button
-                        className={`outgoing-link outgoing-link-${l.status}`}
-                        disabled={!l.target_node_id}
-                        onClick={() => l.target_node_id && selectAndFlush(l.target_node_id)}
-                        title={l.status}
-                      >
-                        {l.display_text ?? l.target_raw}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <BacklinksPanel nodeId={selectedId} onSelect={selectAndFlush} />
-            </aside>
-          )}
-        </>
+        <main className="main-pane pane-workspace">
+          <PaneWorkspace
+            tree={paneTree}
+            activePaneId={activePaneId}
+            items={store.items}
+            renderLeafContent={renderLeafContent}
+            onFocusPane={focusPane}
+            onActivateTab={activateTab}
+            onCloseTab={closeTabHandler}
+            onMoveTab={moveTabHandler}
+            onSplitWithTab={splitHandler}
+            onResize={resizeHandler}
+          />
+        </main>
       )}
 
       <SearchPalette
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
-        onSelect={(id) => selectAndFlush(id)}
+        onSelect={(id) => openNoteInPane(activePaneIdRef.current, id)}
       />
       </div>
     </>

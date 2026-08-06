@@ -3,8 +3,6 @@ import type { ActorKind, NodeSummaryDto, NodeType } from "../types/node";
 import { AuthorBadge } from "./AuthorBadge";
 
 const NODE_TYPES: NodeType[] = ["page", "wiki", "journal", "project", "index", "decision", "research"];
-const ACTORS: ActorKind[] = ["user", "ai", "system"];
-const ACTOR_LABEL: Record<ActorKind, string> = { user: "Me", ai: "AI (Baymax)", system: "Imported" };
 
 interface TreeNode {
   name: string;
@@ -101,7 +99,8 @@ export function FolderTree({
   }
   const tree = useMemo(() => buildTree(items), [items]);
   const allFolderPaths = useMemo(() => collectFolderPaths(tree), [tree]);
-  const filterSummary = `${nodeType ?? "All types"} · ${actor ? ACTOR_LABEL[actor] : "Anyone"}`;
+  const filterSummary = nodeType ?? "All types";
+  const scope = actor === "user" ? "mine" : "everyone";
 
   // Everything starts collapsed on launch — fires once, the first time real
   // folder data shows up, not on every later refresh (which would keep
@@ -183,6 +182,28 @@ export function FolderTree({
 
   return (
     <div className="folder-tree">
+      <div className="folder-tree-scope-toggle">
+        <div
+          className="folder-tree-scope-indicator"
+          style={{ transform: `translateX(${scope === "mine" ? 0 : 100}%)` }}
+        />
+        <button
+          type="button"
+          className={scope === "mine" ? "active" : ""}
+          onClick={() => onActorChange("user")}
+          title="Show only your own notes"
+        >
+          Mine
+        </button>
+        <button
+          type="button"
+          className={scope === "everyone" ? "active" : ""}
+          onClick={() => onActorChange(undefined)}
+          title="Show everyone's notes, including the AI's"
+        >
+          Everyone
+        </button>
+      </div>
       <div className="folder-tree-filter-bar">
         <button
           type="button"
@@ -205,18 +226,6 @@ export function FolderTree({
                 {NODE_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {t}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="folder-tree-filter"
-                value={actor ?? ""}
-                onChange={(e) => onActorChange((e.target.value || undefined) as ActorKind | undefined)}
-              >
-                <option value="">Written by anyone</option>
-                {ACTORS.map((a) => (
-                  <option key={a} value={a}>
-                    {ACTOR_LABEL[a]}
                   </option>
                 ))}
               </select>
