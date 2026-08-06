@@ -235,6 +235,8 @@ function VaultApp() {
       <div className="dialog-backdrop">
         <div className="dialog" style={{ width: "min(420px, 100%)" }}>
           <ConnectionSettings
+            title="Settings"
+            showUpdateSection
             onConnected={() => {
               // Reconfiguring mid-session touches every cached client/server
               // assumption (different vault entirely, potentially) — a full
@@ -304,7 +306,7 @@ function VaultApp() {
             />
           )}
           <button className="reconfigure-trigger" onClick={() => setShowSettings(true)}>
-            ⚙ Server settings
+            ⚙ Settings
           </button>
         </aside>
       )}

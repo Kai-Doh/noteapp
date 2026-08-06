@@ -339,6 +339,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .connection-settings-error { color: var(--color-accent-400); font-size: 0.85em; margin: 0; }
 .connection-settings-actions { display: flex; gap: 8px; margin-top: 6px; }
 
+.settings-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-divider); }
+.settings-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: color-mix(in srgb, var(--color-text) 55%, transparent); margin: 0 0 10px; font-weight: 600; }
+.settings-update-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.85em; }
+.settings-update-status { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+
 .reconfigure-trigger { font-size: 13.5px; padding: 8px 10px; background: transparent; color: color-mix(in srgb, var(--color-text) 55%, transparent); display: flex; align-items: center; gap: 10px; border-radius: var(--radius-md); }
 .reconfigure-trigger:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); color: var(--color-text); }
 

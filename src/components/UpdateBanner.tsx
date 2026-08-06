@@ -1,45 +1,21 @@
-import { useEffect, useState } from "react";
-import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
-
-type Status = "idle" | "downloading" | "installing" | "error";
+import { useEffect } from "react";
+import { useUpdater } from "../hooks/useUpdater";
 
 export function UpdateBanner() {
-  const [update, setUpdate] = useState<Update | null>(null);
-  const [status, setStatus] = useState<Status>("idle");
-  const [error, setError] = useState<string | null>(null);
+  const { update, status, error, checkNow, install, dismiss } = useUpdater();
 
   useEffect(() => {
-    // Deferred + caught, not called bare: `check()` calls into Tauri's
-    // invoke() under the hood, which throws synchronously (not a rejected
-    // promise) outside a real Tauri webview — and a missing/unpublished
-    // update endpoint is an expected, silent outcome either way.
-    Promise.resolve()
-      .then(() => check())
-      .then((result) => setUpdate(result))
-      .catch(() => {});
+    checkNow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!update) return null;
-
-  const handleInstall = async () => {
-    setStatus("downloading");
-    setError(null);
-    try {
-      await update.downloadAndInstall();
-      setStatus("installing");
-      await relaunch();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setStatus("error");
-    }
-  };
 
   return (
     <div className="update-banner">
       <span>Update {update.version} is available.</span>
       {status === "idle" && (
-        <button className="update-banner-install" onClick={handleInstall}>
+        <button className="update-banner-install" onClick={install}>
           Install &amp; Restart
         </button>
       )}
@@ -47,7 +23,7 @@ export function UpdateBanner() {
       {status === "installing" && <span className="update-banner-status">Restarting…</span>}
       {status === "error" && <span className="update-banner-error">Update failed: {error}</span>}
       {status === "idle" && (
-        <button className="update-banner-dismiss" onClick={() => setUpdate(null)}>
+        <button className="update-banner-dismiss" onClick={dismiss}>
           Dismiss
         </button>
       )}
