@@ -12,6 +12,7 @@ import { UpdateBanner } from "./components/UpdateBanner";
 import { NoteEditorPane } from "./components/NoteEditorPane";
 import { PaneWorkspace } from "./components/PaneWorkspace";
 import { useNotesStore } from "./state/notesStore";
+import { patchNode } from "./api/nodes";
 import { apiFetch } from "./api/client";
 import { getServerConfig } from "./api/connection";
 import {
@@ -194,6 +195,16 @@ function VaultApp() {
     [store],
   );
 
+  const handleMoveNote = useCallback(
+    async (id: string, folderPath: string) => {
+      await patchNode(id, {
+        properties: [{ key: "folder", value_type: "text", value_text: folderPath || null }],
+      });
+      await store.refreshList();
+    },
+    [store],
+  );
+
   // Ctrl/Cmd+K: open the search palette. Save-flushing is handled per open
   // tab now (see NoteEditorPane), since more than one can be open at once.
   useEffect(() => {
@@ -293,6 +304,7 @@ function VaultApp() {
               loading={store.listLoading}
               onCreateNote={handleCreateNote}
               onDeleteNote={handleDeleteNote}
+              onMoveNote={handleMoveNote}
             />
           )}
           <button className="reconfigure-trigger" onClick={() => setShowSettings(true)}>

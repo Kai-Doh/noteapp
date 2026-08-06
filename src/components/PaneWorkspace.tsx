@@ -2,11 +2,21 @@ import { useEffect, useRef, useState } from "react";
 import type { LeafPane, PaneNode, SplitEdge } from "../state/paneTree";
 import type { NodeSummaryDto } from "../types/node";
 
-const DRAG_MIME = "application/x-noteapp-tab";
+// Tab dragging is implemented with plain mouse events rather than native
+// HTML5 drag-and-drop — the latter is unreliable inside Tauri's WebView2
+// (drags often never start, or start but never fire a drop), even though it
+// works fine in a regular browser tab. Mouse events are engine-agnostic and
+// already proven out by the split resizer below.
+const DRAG_THRESHOLD_PX = 5;
 
-interface DragPayload {
+interface DragInfo {
   nodeId: string;
   sourcePaneId: string;
+}
+
+interface HoverInfo {
+  paneId: string;
+  zone: SplitEdge | "center";
 }
 
 interface PaneWorkspaceProps {
@@ -22,11 +32,94 @@ interface PaneWorkspaceProps {
   onResize: (splitId: string, ratio: number) => void;
 }
 
-export function PaneWorkspace(props: PaneWorkspaceProps) {
-  return <PaneNodeView {...props} />;
+function resolveHover(x: number, y: number): HoverInfo | null {
+  const el = document.elementFromPoint(x, y);
+  const paneEl = el instanceof Element ? el.closest<HTMLElement>("[data-pane-id]") : null;
+  if (!paneEl) return null;
+  const rect = paneEl.getBoundingClientRect();
+  return { paneId: paneEl.dataset.paneId!, zone: zoneFromPointer(rect, x, y) };
 }
 
-function PaneNodeView(props: PaneWorkspaceProps) {
+export function PaneWorkspace(props: PaneWorkspaceProps) {
+  const [drag, setDrag] = useState<DragInfo | null>(null);
+  const [hover, setHover] = useState<HoverInfo | null>(null);
+  const dragRef = useRef<DragInfo | null>(null);
+  const startRef = useRef<{ nodeId: string; sourcePaneId: string; x: number; y: number } | null>(null);
+  const propsRef = useRef(props);
+  propsRef.current = props;
+
+  const beginPossibleDrag = (nodeId: string, sourcePaneId: string, x: number, y: number) => {
+    startRef.current = { nodeId, sourcePaneId, x, y };
+  };
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!dragRef.current) {
+        const start = startRef.current;
+        if (!start) return;
+        if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < DRAG_THRESHOLD_PX) return;
+        const info = { nodeId: start.nodeId, sourcePaneId: start.sourcePaneId };
+        dragRef.current = info;
+        setDrag(info);
+        document.body.classList.add("pane-dragging");
+      }
+      setHover(resolveHover(e.clientX, e.clientY));
+    }
+
+    function onUp(e: MouseEvent) {
+      const activeDrag = dragRef.current;
+      // Resolved fresh from the mouseup event's own coordinates rather than
+      // trusting whatever `hover` state the last `mousemove` set — some
+      // input sources (automated drags, very fast releases) fire far fewer
+      // move events than a real mouse, so the last-known hover can be stale.
+      const activeHover = activeDrag ? resolveHover(e.clientX, e.clientY) : null;
+      if (activeDrag && activeHover) {
+        if (activeHover.zone === "center") {
+          propsRef.current.onMoveTab(activeDrag.nodeId, activeDrag.sourcePaneId, activeHover.paneId);
+        } else {
+          propsRef.current.onSplitWithTab(
+            activeHover.paneId,
+            activeHover.zone,
+            activeDrag.nodeId,
+            activeDrag.sourcePaneId,
+          );
+        }
+      }
+      startRef.current = null;
+      dragRef.current = null;
+      setDrag(null);
+      setHover(null);
+      document.body.classList.remove("pane-dragging");
+    }
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  return (
+    <PaneNodeView
+      {...props}
+      tree={props.tree}
+      dragActive={!!drag}
+      hoverPaneId={hover?.paneId ?? null}
+      hoverZone={hover?.zone ?? null}
+      onTabMouseDown={beginPossibleDrag}
+    />
+  );
+}
+
+interface RenderProps extends PaneWorkspaceProps {
+  dragActive: boolean;
+  hoverPaneId: string | null;
+  hoverZone: SplitEdge | "center" | null;
+  onTabMouseDown: (nodeId: string, sourcePaneId: string, x: number, y: number) => void;
+}
+
+function PaneNodeView(props: RenderProps) {
   const { tree } = props;
   if (tree.type === "split") {
     return <SplitPaneView {...props} tree={tree} />;
@@ -34,7 +127,7 @@ function PaneNodeView(props: PaneWorkspaceProps) {
   return <LeafPaneView {...props} pane={tree} />;
 }
 
-function SplitPaneView(props: PaneWorkspaceProps & { tree: Extract<PaneNode, { type: "split" }> }) {
+function SplitPaneView(props: RenderProps & { tree: Extract<PaneNode, { type: "split" }> }) {
   const { tree, onResize } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -96,46 +189,19 @@ function LeafPaneView({
   onFocusPane,
   onActivateTab,
   onCloseTab,
-  onMoveTab,
-  onSplitWithTab,
-}: PaneWorkspaceProps & { pane: LeafPane }) {
-  const [dragZone, setDragZone] = useState<SplitEdge | "center" | null>(null);
+  dragActive,
+  hoverPaneId,
+  hoverZone,
+  onTabMouseDown,
+}: RenderProps & { pane: LeafPane }) {
   const isActive = pane.id === activePaneId;
-
-  function handleDragOver(e: React.DragEvent) {
-    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    const rect = e.currentTarget.getBoundingClientRect();
-    setDragZone(zoneFromPointer(rect, e.clientX, e.clientY));
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    // Computed fresh from the drop event itself rather than read from
-    // `dragZone` state — that state is set by `dragover` asynchronously, and
-    // a fast drag-release can fire `drop` before React commits the render
-    // that would have made the latest zone visible to this closure.
-    const rect = e.currentTarget.getBoundingClientRect();
-    const zone = zoneFromPointer(rect, e.clientX, e.clientY);
-    setDragZone(null);
-    const raw = e.dataTransfer.getData(DRAG_MIME);
-    if (!raw) return;
-    const payload = JSON.parse(raw) as DragPayload;
-    if (!zone || zone === "center") {
-      onMoveTab(payload.nodeId, payload.sourcePaneId, pane.id);
-    } else {
-      onSplitWithTab(pane.id, zone, payload.nodeId, payload.sourcePaneId);
-    }
-  }
+  const isHovered = dragActive && hoverPaneId === pane.id;
 
   return (
     <div
       className={`pane-leaf${isActive ? " active" : ""}`}
+      data-pane-id={pane.id}
       onMouseDown={() => onFocusPane(pane.id)}
-      onDragOver={handleDragOver}
-      onDragLeave={() => setDragZone(null)}
-      onDrop={handleDrop}
     >
       <div className="pane-tabbar">
         {pane.tabs.map((id) => {
@@ -144,10 +210,9 @@ function LeafPaneView({
             <div
               key={id}
               className={`pane-tab${id === pane.activeId ? " active" : ""}`}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ nodeId: id, sourcePaneId: pane.id }));
-                e.dataTransfer.effectAllowed = "move";
+              onMouseDown={(e) => {
+                if (e.button !== 0) return;
+                onTabMouseDown(id, pane.id, e.clientX, e.clientY);
               }}
               onClick={() => onActivateTab(pane.id, id)}
               title={item?.title ?? "Untitled"}
@@ -156,6 +221,7 @@ function LeafPaneView({
               <button
                 type="button"
                 className="pane-tab-close"
+                onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
                   onCloseTab(pane.id, id);
@@ -170,8 +236,8 @@ function LeafPaneView({
       </div>
       <div className="pane-leaf-content">
         {renderLeafContent(pane)}
-        {dragZone && (
-          <div className={`pane-drop-overlay pane-drop-overlay-${dragZone}`} />
+        {isHovered && hoverZone && (
+          <div className={`pane-drop-overlay pane-drop-overlay-${hoverZone}`} />
         )}
       </div>
     </div>

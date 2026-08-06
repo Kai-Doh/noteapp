@@ -221,7 +221,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .folder-tree-actions button:hover { color: var(--color-text); border-color: var(--color-accent); }
 
-.folder-tree-folder-row { display: flex; align-items: center; }
+.folder-tree-folder-row { display: flex; align-items: center; border-radius: var(--radius-sm); transition: background 120ms ease, outline-color 120ms ease; outline: 2px solid transparent; outline-offset: -2px; }
+.folder-tree-folder-row.drag-hover { background: color-mix(in srgb, var(--color-accent) 18%, transparent); outline-color: var(--color-accent); }
 .folder-tree-add-btn {
   flex-shrink: 0; font-size: 0.85em; width: 20px; height: 20px; line-height: 1; padding: 0; margin-right: 6px;
   background: transparent; color: color-mix(in srgb, var(--color-text) 55%, transparent); border-radius: 4px; opacity: 0;
@@ -230,14 +231,17 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .folder-tree { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .folder-tree-filter { margin: 8px 0; }
-.folder-tree-list { overflow-y: auto; flex: 1; padding: 0 0 8px; }
+.folder-tree-list { overflow-y: auto; flex: 1; padding: 0 0 8px; outline: 2px solid transparent; outline-offset: -2px; border-radius: var(--radius-sm); transition: outline-color 120ms ease; }
+.folder-tree-list.drag-hover-root { outline-color: color-mix(in srgb, var(--color-accent) 60%, transparent); }
 
 .folder-tree-item {
   display: flex; flex-direction: column; align-items: flex-start; width: 100%; text-align: left;
   border: none; background: transparent; padding: 6px 8px; border-radius: var(--radius-sm); margin-bottom: 2px; font-weight: 400;
+  cursor: grab;
 }
 .folder-tree-item:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); }
 .folder-tree-item.selected { background: var(--color-accent-900); color: var(--color-accent-100); }
+.folder-tree-item.dragging { opacity: 0.4; }
 
 .folder-tree-folder {
   display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; border: none; background: transparent;
@@ -291,14 +295,19 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .pane-tab {
   display: flex; align-items: center; gap: 8px; flex: none; max-width: 200px;
   padding: 7px 8px 7px 12px; font-size: 12.5px; border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  color: color-mix(in srgb, var(--color-text) 60%, transparent); cursor: pointer;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent); cursor: grab;
   border: 1px solid transparent; border-bottom: none; background: transparent;
   transition: background 150ms ease, color 150ms ease;
 }
+body.pane-dragging, body.pane-dragging * { cursor: grabbing !important; user-select: none !important; }
 .pane-tab:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); }
 .pane-tab.active {
   color: var(--color-text); background: var(--color-bg);
-  border-color: var(--color-divider);
+  border-color: var(--color-divider); position: relative;
+  /* Extends 1px past the tabbar's own border-bottom and paints over it in
+     the content's background color, so the active tab visually fuses with
+     the pane below instead of reading as a separate strip above a line. */
+  margin-bottom: -1px; border-bottom: 1px solid var(--color-bg);
 }
 .pane-tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pane-tab-close {

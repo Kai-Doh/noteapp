@@ -59,6 +59,8 @@ interface FolderTreeProps {
   /** Creates a new note, optionally pre-assigned to a folder path. */
   onCreateNote: (folderPath?: string) => void | Promise<void>;
   onDeleteNote: (id: string) => void | Promise<void>;
+  /** Reassigns a note's folder property; "" moves it back to the root. */
+  onMoveNote: (id: string, folderPath: string) => void | Promise<void>;
 }
 
 interface ContextMenuState {
@@ -66,6 +68,14 @@ interface ContextMenuState {
   title: string;
   x: number;
   y: number;
+}
+
+const DRAG_THRESHOLD_PX = 5;
+
+function resolveHoverFolder(x: number, y: number): string | null {
+  const el = document.elementFromPoint(x, y);
+  const target = el instanceof Element ? el.closest<HTMLElement>("[data-folder-path]") : null;
+  return target ? target.dataset.folderPath! : null;
 }
 
 // Virtual folders, same principle as node_type filtering: a `folder` property
@@ -84,10 +94,57 @@ export function FolderTree({
   loading,
   onCreateNote,
   onDeleteNote,
+  onMoveNote,
 }: FolderTreeProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  // Note-to-folder dragging, via plain mouse events rather than native HTML5
+  // drag-and-drop — the latter doesn't fire reliably inside Tauri's WebView2.
+  const [dragNoteId, setDragNoteId] = useState<string | null>(null);
+  const [hoverFolder, setHoverFolder] = useState<string | null>(null);
+  const startRef = useRef<{ id: string; folder: string; x: number; y: number } | null>(null);
+  const dragRef = useRef<{ id: string; folder: string } | null>(null);
+  const hoverRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!dragRef.current) {
+        const start = startRef.current;
+        if (!start) return;
+        if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < DRAG_THRESHOLD_PX) return;
+        dragRef.current = { id: start.id, folder: start.folder };
+        setDragNoteId(start.id);
+        document.body.classList.add("pane-dragging");
+      }
+      const path = resolveHoverFolder(e.clientX, e.clientY);
+      hoverRef.current = path;
+      setHoverFolder(path);
+    }
+    function onUp(e: MouseEvent) {
+      const drag = dragRef.current;
+      // Resolved fresh from the mouseup event's own coordinates — some input
+      // sources fire far fewer intermediate `mousemove` events than a real
+      // mouse, so the last-known hover state can be stale by drop time.
+      const hover = drag ? resolveHoverFolder(e.clientX, e.clientY) : null;
+      if (drag && hover !== null && hover !== drag.folder) {
+        onMoveNote(drag.id, hover);
+      }
+      startRef.current = null;
+      dragRef.current = null;
+      hoverRef.current = null;
+      setDragNoteId(null);
+      setHoverFolder(null);
+      document.body.classList.remove("pane-dragging");
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [onMoveNote]);
 
   function handleDelete() {
     if (!contextMenu) return;
@@ -133,7 +190,11 @@ export function FolderTree({
     return (
       <div key={node.path || "__root_items__"}>
         {node.path && (
-          <div className="folder-tree-folder-row" style={{ paddingLeft: `${depth * 14}px` }}>
+          <div
+            className={`folder-tree-folder-row${hoverFolder === node.path ? " drag-hover" : ""}`}
+            data-folder-path={node.path}
+            style={{ paddingLeft: `${depth * 14}px` }}
+          >
             <button className="folder-tree-folder" onClick={() => toggle(node.path)}>
               <span className={`folder-tree-caret${isCollapsed ? " collapsed" : ""}`}>▾</span>
               <span className="folder-tree-folder-name">{node.name}</span>
@@ -158,9 +219,13 @@ export function FolderTree({
               .map((item) => (
                 <button
                   key={item.id}
-                  className={`folder-tree-item${item.id === selectedId ? " selected" : ""}`}
+                  className={`folder-tree-item${item.id === selectedId ? " selected" : ""}${dragNoteId === item.id ? " dragging" : ""}`}
                   style={{ paddingLeft: `${8 + (node.path ? depth + 1 : depth) * 14}px` }}
                   onClick={() => onSelect(item.id)}
+                  onMouseDown={(e) => {
+                    if (e.button !== 0) return;
+                    startRef.current = { id: item.id, folder: node.path, x: e.clientX, y: e.clientY };
+                  }}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     setContextMenu({ id: item.id, title: item.title, x: e.clientX, y: e.clientY });
@@ -251,7 +316,7 @@ export function FolderTree({
           {allCollapsed ? "Expand all" : "Collapse all"}
         </button>
       </div>
-      <div className="folder-tree-list">
+      <div className={`folder-tree-list${hoverFolder === "" ? " drag-hover-root" : ""}`} data-folder-path="">
         {loading && <div className="folder-tree-empty">Loading…</div>}
         {!loading && items.length === 0 && <div className="folder-tree-empty">No notes yet</div>}
         {!loading && items.length > 0 && renderNode(tree, 0)}
