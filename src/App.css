@@ -324,16 +324,20 @@ body.pane-dragging, body.pane-dragging * { cursor: grabbing !important; user-sel
 }
 .pane-tab-close:hover { background: color-mix(in srgb, var(--color-text) 14%, transparent); color: var(--color-text); }
 
-.pane-drop-overlay {
-  position: absolute; z-index: 5; pointer-events: none;
-  background: color-mix(in srgb, var(--color-accent) 24%, transparent);
-  border: 2px solid var(--color-accent);
+/* Live split preview — no highlight rectangle; the pane's real content
+   physically shrinks toward where it'll end up and a bare (unstyled) region
+   grows to fill the rest, so the motion itself is the only indicator. */
+.pane-preview-split { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.pane-preview-split-row { flex-direction: row; }
+.pane-preview-split-col { flex-direction: column; }
+.pane-preview-phantom {
+  flex-basis: 0; min-width: 0; min-height: 0; overflow: hidden;
+  transition: flex-grow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.pane-drop-overlay-center { inset: 0; }
-.pane-drop-overlay-left { top: 0; bottom: 0; left: 0; width: 50%; }
-.pane-drop-overlay-right { top: 0; bottom: 0; right: 0; width: 50%; }
-.pane-drop-overlay-top { left: 0; right: 0; top: 0; height: 50%; }
-.pane-drop-overlay-bottom { left: 0; right: 0; bottom: 0; height: 50%; }
+.pane-preview-real {
+  flex-basis: 0; min-width: 0; min-height: 0; overflow: hidden; display: flex;
+  transition: flex-grow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 
 .note-editor-pane { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 
@@ -366,16 +370,22 @@ body.pane-dragging, body.pane-dragging * { cursor: grabbing !important; user-sel
 .type-tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.55; flex: none; }
 
 .note-view { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; height: 100%; }
-.note-header { display: flex; align-items: center; gap: 12px; padding: 16px 32px 0; }
+.note-header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 16px 32px 0; }
 .note-title-input {
-  flex: 1; min-width: 0; font-size: 30px; font-weight: 500; font-family: "Inter", system-ui, sans-serif;
+  /* A tab's pane can get much narrower than a full window once split — this
+     needs a real floor so the fixed-width sibling fields below can never
+     squeeze it down to an unreadable sliver (it happened: down to ~6px). */
+  flex: 10 1 140px; min-width: 140px; font-size: 30px; font-weight: 500; font-family: "Inter", system-ui, sans-serif;
   border: none; background: transparent; padding: 6px 0; min-height: 0;
 }
 .note-folder-input {
-  width: 220px; flex-shrink: 0; font-size: 12px; opacity: .75; border: 1px solid var(--color-divider);
-  background: transparent; padding: 4px 8px; min-height: 0;
+  flex: 1 1 140px; width: auto; min-width: 90px; max-width: 220px; font-size: 12px; opacity: .75;
+  border: 1px solid var(--color-divider); background: transparent; padding: 4px 8px; min-height: 0;
 }
-.save-status { color: color-mix(in srgb, var(--color-text) 45%, transparent); font-size: 11.5px; white-space: nowrap; }
+.save-status {
+  color: color-mix(in srgb, var(--color-text) 45%, transparent); font-size: 11.5px; white-space: nowrap;
+  flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis;
+}
 .note-editor { flex: 1; min-height: 0; padding: 0 32px 60px; max-width: 680px; }
 
 /* Formatting toolbar — added new (not in the design handoff, which only had

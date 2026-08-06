@@ -261,11 +261,31 @@ function LeafPaneView({
         })}
       </div>
       <div className="pane-leaf-content">
-        {renderLeafContent(pane)}
-        {isHovered && hoverZone && (
-          <div className={`pane-drop-overlay pane-drop-overlay-${hoverZone}`} />
-        )}
+        <SplitPreview zone={isHovered ? hoverZone : null}>{renderLeafContent(pane)}</SplitPreview>
       </div>
+    </div>
+  );
+}
+
+const PREVIEW_RATIO = 0.5;
+
+// Live preview of a pending split: rather than a highlight overlay, the
+// pane's actual content resizes in place toward where it'll end up, and eases
+// back out if the drag leaves without dropping — no separate rectangle to
+// interpret, the layout itself shows what's about to happen.
+function SplitPreview({ zone, children }: { zone: SplitEdge | "center" | null; children: React.ReactNode }) {
+  const splitting = zone !== null && zone !== "center";
+  const dir = splitting && (zone === "left" || zone === "right") ? "row" : "col";
+  const phantomFirst = zone === "left" || zone === "top";
+  const phantom = <div className="pane-preview-phantom" style={{ flexGrow: splitting ? PREVIEW_RATIO : 0 }} />;
+
+  return (
+    <div className={`pane-preview-split pane-preview-split-${dir}`}>
+      {phantomFirst && phantom}
+      <div className="pane-preview-real" style={{ flexGrow: splitting ? 1 - PREVIEW_RATIO : 1 }}>
+        {children}
+      </div>
+      {!phantomFirst && phantom}
     </div>
   );
 }
