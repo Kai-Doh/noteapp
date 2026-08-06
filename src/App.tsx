@@ -289,6 +289,7 @@ function VaultApp() {
               onSelect={selectAndFlush}
               loading={store.listLoading}
               onCreateNote={handleCreateNote}
+              onDeleteNote={store.deleteNode}
             />
           )}
           <button className="reconfigure-trigger" onClick={() => setShowSettings(true)}>

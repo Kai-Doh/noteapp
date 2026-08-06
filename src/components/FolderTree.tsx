@@ -60,6 +60,14 @@ interface FolderTreeProps {
   loading: boolean;
   /** Creates a new note, optionally pre-assigned to a folder path. */
   onCreateNote: (folderPath?: string) => void | Promise<void>;
+  onDeleteNote: (id: string) => void | Promise<void>;
+}
+
+interface ContextMenuState {
+  id: string;
+  title: string;
+  x: number;
+  y: number;
 }
 
 // Virtual folders, same principle as node_type filtering: a `folder` property
@@ -77,9 +85,20 @@ export function FolderTree({
   onSelect,
   loading,
   onCreateNote,
+  onDeleteNote,
 }: FolderTreeProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  function handleDelete() {
+    if (!contextMenu) return;
+    const { id, title } = contextMenu;
+    setContextMenu(null);
+    if (window.confirm(`Delete "${title}"? This can't be undone from here.`)) {
+      onDeleteNote(id);
+    }
+  }
   const tree = useMemo(() => buildTree(items), [items]);
   const allFolderPaths = useMemo(() => collectFolderPaths(tree), [tree]);
   const filterSummary = `${nodeType ?? "All types"} · ${actor ? ACTOR_LABEL[actor] : "Anyone"}`;
@@ -143,6 +162,10 @@ export function FolderTree({
                   className={`folder-tree-item${item.id === selectedId ? " selected" : ""}`}
                   style={{ paddingLeft: `${8 + (node.path ? depth + 1 : depth) * 14}px` }}
                   onClick={() => onSelect(item.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ id: item.id, title: item.title, x: e.clientX, y: e.clientY });
+                  }}
                   title={item.title}
                 >
                   <span className="folder-tree-item-meta">
@@ -224,6 +247,19 @@ export function FolderTree({
         {!loading && items.length === 0 && <div className="folder-tree-empty">No notes yet</div>}
         {!loading && items.length > 0 && renderNode(tree, 0)}
       </div>
+      {contextMenu && (
+        <>
+          <div className="folder-tree-filter-scrim" onClick={() => setContextMenu(null)} />
+          <div
+            className="folder-tree-context-menu"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <button type="button" className="folder-tree-context-menu-delete" onClick={handleDelete}>
+              Delete
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

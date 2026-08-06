@@ -44,6 +44,10 @@ export function getNode(id: string): Promise<NodeDto> {
   return apiFetch(`/nodes/${id}`);
 }
 
+export function deleteNode(id: string): Promise<WriteResultDto> {
+  return apiFetch(`/nodes/${id}`, { method: "DELETE" });
+}
+
 export function listNodes(
   params: { node_type?: string; created_by?: ActorKind; limit?: number } = {},
 ): Promise<{

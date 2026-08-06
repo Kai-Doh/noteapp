@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { createNode, getNode, listNodes } from "../api/nodes";
+import { createNode, deleteNode as apiDeleteNode, getNode, listNodes } from "../api/nodes";
 import type { ActorKind, NodeDto, NodeSummaryDto, NodeType } from "../types/node";
 
 export function useNotesStore() {
@@ -59,6 +59,18 @@ export function useNotesStore() {
     [refreshList, selectNode],
   );
 
+  const deleteNode = useCallback(
+    async (id: string) => {
+      await apiDeleteNode(id);
+      if (selectedId === id) {
+        setSelectedId(null);
+        setSelectedNode(null);
+      }
+      await refreshList();
+    },
+    [selectedId, refreshList],
+  );
+
   const selectByTitle = useCallback(
     async (title: string) => {
       const normalized = title.trim().toLowerCase();
@@ -89,6 +101,7 @@ export function useNotesStore() {
     selectNode,
     refreshSelected,
     createAndSelect,
+    deleteNode,
     selectByTitle,
   };
 }
