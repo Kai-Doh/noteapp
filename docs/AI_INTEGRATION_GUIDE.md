@@ -79,9 +79,10 @@ hand-rolling HTTP calls where it already covers what you need (`context`,
 ## 2. Core data model
 
 Everything lives in one table, **`nodes`** — there's no separate "folder"
-concept; folders are a purely cosmetic grouping the client derives from
-`node_type` (or Obsidian's original directory structure, preserved as a
-`migration_source_path` property — see §5). A node has:
+table. The folder tree shown in the desktop app is backed by a `properties`
+row with `key: "folder"`, a freeform slash-separated string (e.g.
+`"Fitness/Nutrition"`) set like any other property — see the `folder`
+property convention below. A node has:
 
 | Field | Notes |
 |---|---|
@@ -109,6 +110,21 @@ Arbitrary typed metadata per node — `text`, `number`, `bool`, `date`, or
 Only one of `value_text`/`value_number`/`value_bool`/`value_date`/`value_node_id`
 should be set, matching `value_type`. Properties are upserted by `(node_id, key)`
 — posting the same key again overwrites it, it doesn't duplicate.
+
+**The `folder` property, specifically**: this is the one designated property
+key the desktop UI treats specially — it drives the sidebar's folder tree and
+the "Mine only" view. `value_type: "text"`, freeform, slash-separated (e.g.
+`"Projects/SOFI"`), same "nothing lives in real directories, a folder only
+exists as long as one note references it" convention as `node_type`. Set it
+like any other property on create/patch:
+
+```json
+{ "properties": [{ "key": "folder", "value_type": "text", "value_text": "Projects/SOFI" }] }
+```
+
+`GET /nodes` (list) includes `folder` directly in each summary item (see
+below) so you don't need `GET /nodes/{id}` just to know where something is
+filed.
 
 ### Wikilinks and aliases — read this before writing an importer
 
@@ -208,9 +224,10 @@ POST   /nodes                      create a node
   body: { title, node_type?, content?, vault_code?, export_policy?, properties?: [...] }
   node_type defaults to "page"; export_policy defaults to "export"
 
-GET    /nodes?node_type=&limit=    list nodes (summary form), newest-updated first
-  limit defaults to 50, clamped to [1, 500]
-  -> { "items": [{ id, title, node_type, vault_code, updated_at, created_by }] }
+GET    /nodes?node_type=&created_by=&limit=   list nodes (summary form), newest-updated first
+  limit defaults to 50, clamped to [1, 500]; created_by filters to "user"|"ai"|"system"
+  -> { "items": [{ id, title, node_type, vault_code, updated_at, created_by, folder }] }
+  folder is the "folder" property's value_text (null if unset) — see §2
 
 GET    /nodes/{id}                 full node, including properties[] and links[]
 
@@ -315,6 +332,78 @@ a row here — this is the full audit trail, and it's how the desktop app's
 "AI Activity Feed" is built. Filter by `actor` (`user`/`ai`/`system`) to see
 just what one caller kind has done.
 
+### Graph — `/graph` (scope: `read`)
+
+```
+GET /graph?node_type=&actor=&updated_after=&updated_before=&tag=&hide_daily=&unresolved_only=&ai_written_only=&pending_review_only=
+```
+
+All params optional and ANDed together (plus a hardcoded "not soft-deleted").
+Filtering happens in SQL, not client-side, so this stays cheap even on a
+large vault:
+
+| param | type | effect |
+|---|---|---|
+| `node_type` | string | exact match |
+| `actor` | string | exact match on `created_by` |
+| `updated_after` / `updated_before` | RFC3339 string | bounds on `updated_at` (no `created_at` range option) |
+| `tag` | string | exact match on a `properties` row `key='tag'` (not a substring/LIKE match) |
+| `hide_daily` | bool | excludes `node_type = 'journal'` |
+| `unresolved_only` | bool | keeps only nodes with an outgoing unresolved link, **and** restricts returned edges to `status='unresolved'` (edges with `status='ambiguous'` are dropped too in this mode) |
+| `ai_written_only` | bool | shorthand for `created_by = 'ai'` |
+| `pending_review_only` | bool | keeps nodes with a `pending`/`approved` row in the review queue |
+
+Response:
+```json
+{
+  "nodes": [{ "id", "title", "node_type", "created_by", "color_key" }],
+  "edges": [{ "source", "target", "link_type", "status" }]
+}
+```
+`edges[].target` is `null` for an unresolved/dangling link (rendered as a
+stub off the source node). `color_key` is derived from `created_by`, not
+`node_type` — `"user"` / `"ai"` / `"system"`, a fixed 3-value palette so the
+frontend never needs updating as `node_type` grows; `node_type` is exposed
+separately if you want a secondary encoding (shape, opacity, etc).
+
+### Maintenance — `/maintenance` (scope: `maintenance` to run, `read` to list —
+the `agent` token can read findings but **cannot** trigger a run)
+
+```
+POST /maintenance/run              runs all 4 lint checks now
+  no request body
+  -> { "id", "revision_number" }   id is a fresh changelog-entry id, not tied
+                                    to any one finding — the actual counts
+                                    live in that changelog row's diff_json
+                                    ({ findings_count, by_type: {...} }),
+                                    not in this response. Call
+                                    GET /maintenance/findings afterward for
+                                    the findings themselves.
+
+GET /maintenance/findings?status=&finding_type=
+  -> { "items": [{ id, finding_type, severity, entity_id, description,
+                    suggested_fix, status, created_at, resolved_at }] }
+  ordered created_at desc
+```
+
+Findings are persisted, not just returned once — each run first clears
+existing `status='open'` rows for the 4 known types, then inserts fresh ones,
+so re-running doesn't accumulate duplicates and `GET /maintenance/findings`
+always reflects the last run. On-demand only; nothing schedules this
+automatically.
+
+The 4 checks actually implemented (`finding_type` values):
+- **`orphan_node`** (severity `info`) — a node with no *resolved* link where
+  it's source or target (unresolved/ambiguous links don't count as "linked").
+- **`unresolved_link`** (severity `warning`) — any `links` row with
+  `status='unresolved'`.
+- **`stale_memory`** (severity `info`) — an approved, unpinned `hot_memory`/
+  `user_profile` entry not included in a compile for 30+ days.
+- **`conflicting_memory`** (severity `warning`, `entity_id` always `null`) —
+  same conflict detection `GET /memory/context` runs inline, but over the
+  full approved set independent of any one compile call; the conflicting
+  entry IDs are embedded in `description` text, not a structured field.
+
 ### Backup / Export (scope: `backup` / `export` — the `agent` token does **not**
 have these; use `system` or `desktop` if you genuinely need them)
 
@@ -331,13 +420,15 @@ POST /export              one-way markdown export to the server's export dir
 
 Quick summary, since it's easy to assume "AI token" means "full access":
 
-- ✅ read anything (`GET /nodes`, `/search`, `/memory/*`, `/changelog`, `/review`)
+- ✅ read anything (`GET /nodes`, `/search`, `/memory/*`, `/changelog`, `/review`,
+  `/graph`, `/maintenance/findings`)
 - ✅ create/update/append/delete nodes and aliases directly
 - ✅ create/update/delete `hot_memory`/`user_profile` entries directly — **but only**
   `sensitivity: "normal"` and `source_type` other than `"ai_inference"` (see §6)
 - ✅ propose review items (`POST /review`)
 - ❌ approve/reject/apply review items (`require_non_ai` guard — 400 if attempted)
-- ❌ backup, restore, export, maintenance routes (403 — wrong scope)
+- ❌ backup, restore, export routes (403 — wrong scope)
+- ❌ `POST /maintenance/run` (403 — needs `maintenance` scope; reading findings is fine)
 
 ---
 
