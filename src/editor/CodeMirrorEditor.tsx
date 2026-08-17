@@ -5,6 +5,7 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { wikilinkAutocomplete, wikilinkClickNavigation, wikilinkDecorations } from "./wikilinkExtension";
 import { markdownDecorations } from "./markdownDecorations";
+import { tableDecorations } from "./tableDecorations";
 import { aliveTyping } from "./aliveTyping";
 
 interface CodeMirrorEditorProps {
@@ -112,6 +113,7 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, CodeMirrorEdi
           keymap.of([...defaultKeymap, ...historyKeymap]),
           markdown(),
           markdownDecorations(),
+          tableDecorations(),
           aliveTyping(),
           wikilinkDecorations(),
           wikilinkClickNavigation((title) => onNavigateRef.current(title)),
@@ -158,6 +160,24 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, CodeMirrorEdi
             },
             ".cm-md-quote": { color: "var(--muted, #767676)", fontStyle: "italic" },
             ".cm-md-mark": { opacity: "0.4", transition: "opacity 150ms ease" },
+            ".cm-md-table-wrap": {
+              overflowX: "auto", margin: "4px 0", cursor: "text",
+            },
+            ".cm-md-table": {
+              borderCollapse: "collapse", fontFamily: "ui-sans-serif, system-ui, sans-serif",
+              fontSize: "13px", minWidth: "100%",
+            },
+            ".cm-md-table th, .cm-md-table td": {
+              border: "1px solid var(--color-divider, #3a3d4d)",
+              padding: "6px 10px", textAlign: "left", verticalAlign: "top",
+            },
+            ".cm-md-table th": {
+              background: "color-mix(in srgb, currentColor 8%, transparent)",
+              fontWeight: "600",
+            },
+            ".cm-md-table tbody tr:nth-child(even)": {
+              background: "color-mix(in srgb, currentColor 3%, transparent)",
+            },
             // Freshly-typed text pops in rather than just appearing —
             // aliveTyping.ts marks the exact inserted range for ~250ms.
             ".cm-just-typed": {
