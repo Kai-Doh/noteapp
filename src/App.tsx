@@ -16,6 +16,7 @@ import { patchNode } from "./api/nodes";
 import { apiFetch } from "./api/client";
 import { getServerConfig } from "./api/connection";
 import {
+  clearActiveTab,
   closeTab,
   closeTabEverywhere,
   collectLeaves,
@@ -104,6 +105,9 @@ function VaultApp() {
   const [rightCollapsed, setRightCollapsed] = useState(
     () => localStorage.getItem("noteapp.rightCollapsed") === "1",
   );
+  const [previewMode, setPreviewMode] = useState(
+    () => localStorage.getItem("noteapp.previewMode") === "1",
+  );
 
   const [paneTree, setPaneTree] = useState<PaneNode>(() => loadPaneTree());
   const [activePaneId, setActivePaneId] = useState<string>(() => collectLeaves(paneTree)[0].id);
@@ -118,6 +122,9 @@ function VaultApp() {
   useEffect(() => {
     localStorage.setItem("noteapp.rightCollapsed", rightCollapsed ? "1" : "0");
   }, [rightCollapsed]);
+  useEffect(() => {
+    localStorage.setItem("noteapp.previewMode", previewMode ? "1" : "0");
+  }, [previewMode]);
   useEffect(() => {
     savePaneTree(paneTree);
   }, [paneTree]);
@@ -195,6 +202,13 @@ function VaultApp() {
     [store],
   );
 
+  // Drops back to the dashboard without closing any open tabs — they're
+  // still sitting in the tab bar, just none of them is the active one.
+  const handleGoHome = useCallback(() => {
+    setPaneTree((t) => clearActiveTab(t, activePaneIdRef.current));
+    setViewMode("notes");
+  }, []);
+
   const handleMoveNote = useCallback(
     async (id: string, folderPath: string) => {
       await patchNode(id, {
@@ -257,6 +271,8 @@ function VaultApp() {
         onNoteSaved={() => store.refreshList()}
         rightCollapsed={rightCollapsed}
         onToggleRight={() => setRightCollapsed((c) => !c)}
+        previewMode={previewMode}
+        onTogglePreview={() => setPreviewMode((p) => !p)}
       />
     );
   }
@@ -271,6 +287,17 @@ function VaultApp() {
             <span className="brand-mark">N</span>
             <span className="app-title">noteapp</span>
           </div>
+          <button
+            className="sidebar-home-btn"
+            onClick={handleGoHome}
+            title="Back to the dashboard — your open tabs stay open"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 11.5 12 4l9 7.5" />
+              <path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9" />
+            </svg>
+            Home
+          </button>
           <button className="sidebar-new-note-btn" onClick={() => handleCreateNote()}>
             + New note
           </button>

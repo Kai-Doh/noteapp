@@ -37,7 +37,15 @@ function buildDecorations(view: EditorView): DecorationSet {
         } else if (node.name === "Blockquote") {
           positions.push([node.from, node.to, Decoration.mark({ class: "cm-md-quote" })]);
         } else if (node.name === "HeaderMark" || node.name === "EmphasisMark" || node.name === "CodeMark" || node.name === "QuoteMark") {
-          positions.push([node.from, node.to, Decoration.mark({ class: "cm-md-mark" })]);
+          // HeaderMark/QuoteMark are followed by a single required space
+          // ("# " / "> ") that belongs to neither node — swallow it too so
+          // hiding the mark in preview mode doesn't leave a stray leading
+          // space before the heading/quote text.
+          let to = node.to;
+          if (node.name === "HeaderMark" || node.name === "QuoteMark") {
+            if (view.state.sliceDoc(to, to + 1) === " ") to += 1;
+          }
+          positions.push([node.from, to, Decoration.mark({ class: "cm-md-mark" })]);
         }
       },
     });

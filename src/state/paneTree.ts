@@ -65,6 +65,13 @@ export function setActiveTab(tree: PaneNode, paneId: string, nodeId: string): Pa
   return mapLeaf(tree, paneId, (leaf) => ({ ...leaf, activeId: nodeId }));
 }
 
+// Clears the active tab without closing any of them — used by the "Home"
+// button to drop back to the dashboard while keeping every open tab around
+// to click back into.
+export function clearActiveTab(tree: PaneNode, paneId: string): PaneNode {
+  return mapLeaf(tree, paneId, (leaf) => ({ ...leaf, activeId: null }));
+}
+
 function removeTabFromLeaf(node: PaneNode, paneId: string, nodeId: string): PaneNode {
   return mapLeaf(node, paneId, (leaf) => {
     const tabs = leaf.tabs.filter((t) => t !== nodeId);

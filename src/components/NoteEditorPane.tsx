@@ -50,12 +50,23 @@ interface NoteEditorPaneProps {
   onNoteSaved: () => void;
   rightCollapsed: boolean;
   onToggleRight: () => void;
+  previewMode: boolean;
+  onTogglePreview: () => void;
 }
 
 // One instance per open tab's active render — owns the draft/autosave state
 // for whichever note it's currently pointed at, mirroring how a single
 // global selection used to work before tabs existed, just scoped per pane.
-export function NoteEditorPane({ nodeId, onNavigateToTitle, onOpenById, onNoteSaved, rightCollapsed, onToggleRight }: NoteEditorPaneProps) {
+export function NoteEditorPane({
+  nodeId,
+  onNavigateToTitle,
+  onOpenById,
+  onNoteSaved,
+  rightCollapsed,
+  onToggleRight,
+  previewMode,
+  onTogglePreview,
+}: NoteEditorPaneProps) {
   const [node, setNode] = useState<NodeDto | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -175,6 +186,18 @@ export function NoteEditorPane({ nodeId, onNavigateToTitle, onOpenById, onNoteSa
               {btn.icon}
             </button>
           ))}
+          <span className="editor-toolbar-divider" />
+          <button
+            type="button"
+            className={`editor-toolbar-btn${previewMode ? " active" : ""}`}
+            title={previewMode ? "Show raw markdown characters" : "Hide markdown characters (clean preview)"}
+            onClick={onTogglePreview}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
         </div>
         <div className="note-editor">
           <CodeMirrorEditor
@@ -183,6 +206,7 @@ export function NoteEditorPane({ nodeId, onNavigateToTitle, onOpenById, onNoteSa
             onChange={setContent}
             onBlur={() => autosave.flush()}
             onNavigateToTitle={onNavigateToTitle}
+            previewMode={previewMode}
           />
         </div>
       </div>

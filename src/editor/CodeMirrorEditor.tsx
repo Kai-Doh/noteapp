@@ -13,6 +13,10 @@ interface CodeMirrorEditorProps {
   onChange: (value: string) => void;
   onBlur?: () => void;
   onNavigateToTitle: (title: string) => void;
+  /** Hides raw markdown syntax characters (#, **, `, >) entirely instead of
+   *  just dimming them — a clean reading look rather than always-visible
+   *  live-preview source. */
+  previewMode?: boolean;
 }
 
 export type FormatKind = "bold" | "italic" | "list" | "quote" | "link";
@@ -22,7 +26,7 @@ export interface CodeMirrorEditorHandle {
 }
 
 export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, CodeMirrorEditorProps>(
-  function CodeMirrorEditor({ value, onChange, onBlur, onNavigateToTitle }, ref) {
+  function CodeMirrorEditor({ value, onChange, onBlur, onNavigateToTitle, previewMode }, ref) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const viewRef = useRef<EditorView | null>(null);
 
@@ -222,11 +226,18 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, CodeMirrorEdi
             ".cm-activeLine": {
               backgroundColor: "color-mix(in srgb, currentColor 5%, transparent)",
             },
+            // Preview mode: the raw syntax characters (already marked
+            // .cm-md-mark by markdownDecorations.ts) collapse away entirely
+            // instead of just fading, for a clean reading look. The
+            // underlying document positions are untouched — CM6 still maps
+            // clicks/cursor through the hidden span correctly.
+            "&.cm-preview-mode .cm-md-mark": { display: "none" },
           }),
         ],
       });
 
       const view = new EditorView({ state, parent: containerRef.current });
+      view.dom.classList.toggle("cm-preview-mode", !!previewMode);
       viewRef.current = view;
       return () => {
         view.destroy();
@@ -246,6 +257,10 @@ export const CodeMirrorEditor = forwardRef<CodeMirrorEditorHandle, CodeMirrorEdi
         view.dispatch({ changes: { from: 0, to: current.length, insert: value } });
       }
     }, [value]);
+
+    useEffect(() => {
+      viewRef.current?.dom.classList.toggle("cm-preview-mode", !!previewMode);
+    }, [previewMode]);
 
     return <div ref={containerRef} style={{ height: "100%", minHeight: 0 }} />;
   },
